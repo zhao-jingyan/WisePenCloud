@@ -24,6 +24,7 @@ import org.springframework.http.converter.json.MappingJackson2HttpMessageConvert
 public class FeignConfiguration {
 
     // 读取配置中的安全密钥
+    // 默认值为 APISIX-wX0iR6tY，可在 Nacos 中覆盖
     @Value("${wisepen.security.from-source:APISIX-wX0iR6tY}")
     private String fromSource;
 

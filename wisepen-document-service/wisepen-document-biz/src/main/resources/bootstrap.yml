@@ -12,13 +12,13 @@ spring:
   cloud:
     nacos:
       discovery:
-        server-addr: wisepen-dev-server:8848
-        username: ${NACOS_USERNAME}
-        password: ${NACOS_PASSWORD}
+        server-addr: ${NACOS_SERVER_ADDR:localhost:8848}
+        username: ${NACOS_USERNAME:nacos}
+        password: ${NACOS_PASSWORD:nacos}
       config:
-        server-addr: wisepen-dev-server:8848
-        username: ${NACOS_USERNAME}
-        password: ${NACOS_PASSWORD}
+        server-addr: ${NACOS_SERVER_ADDR:localhost:8848}
+        username: ${NACOS_USERNAME:nacos}
+        password: ${NACOS_PASSWORD:nacos}
         file-extension: yaml
         group: DEFAULT_GROUP
         shared-configs:
@@ -36,7 +36,7 @@ jodconverter:
     enabled: false
   remote:
     enabled: true
-    url: http://wisepen-dev-server:8100/
+    url: http://localhost:8100/
 
 
 logging:

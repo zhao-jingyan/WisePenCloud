@@ -1,12 +1,19 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="ResourceApplication" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot">
-    <envs>
-      <env name="NACOS_USERNAME" value="nacos" />
-      <env name="NACOS_PASSWORD" value="oriole003" />
-    </envs>
     <module name="wisepen-resource-biz" />
     <option name="SPRING_BOOT_MAIN_CLASS" value="com.oriole.wisepen.resource.ResPermissionApplication" />
-    <option name="VM_PARAMETERS" value="-javaagent:$ProjectFileDir$/opentelemetry-javaagent.jar -Dotel.service.name=wisepen-resource-service -Dotel.traces.sampler=always_on -Dotel.exporter.otlp.endpoint=http://wisepen-dev-server:4318" />
+    <option name="VM_PARAMETERS" value="-javaagent:$ProjectFileDir$/opentelemetry-javaagent.jar -Dotel.service.name=wisepen-resource-service -Dotel.traces.sampler=always_on" />
+    <extension name="net.ashald.envfile">
+      <option name="IS_ENABLED" value="true" />
+      <option name="IS_SUBST" value="false" />
+      <option name="IS_PATH_MACRO_SUPPORTED" value="false" />
+      <option name="IS_IGNORE_MISSING_FILES" value="false" />
+      <option name="IS_ENABLE_EXPERIMENTAL_INTEGRATIONS" value="false" />
+      <ENTRIES>
+        <ENTRY IS_ENABLED="true" PARSER="runconfig" IS_EXECUTABLE="false" />
+        <ENTRY IS_ENABLED="true" PARSER="env" IS_EXECUTABLE="false" PATH=".env" />
+      </ENTRIES>
+    </extension>
     <method v="2">
       <option name="Make" enabled="true" />
     </method>

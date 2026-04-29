@@ -16,6 +16,8 @@ import org.springframework.web.servlet.config.annotation.CorsRegistry;
 @ComponentScan(basePackages = "com.oriole.wisepen.common")
 public class WisepenWebAutoConfiguration implements WebMvcConfigurer {
 
+    // 读取配置中的安全密钥
+    // 默认值为 APISIX-wX0iR6tY，可在 Nacos 中覆盖
     @Value("${wisepen.security.from-source:APISIX-wX0iR6tY}")
     private String fromSource;
 
