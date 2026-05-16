@@ -72,7 +72,9 @@ public class TagServiceImpl implements ITagService {
         if (groupID.startsWith(ResourceConstants.PERSONAL_GROUP_PREFIX)){
             // 个人组标签不能设置标签权限
             entity.setAclGrantMode(null);
-            entity.setSpecifiedUsers(null);
+            entity.setResourceMountMode(null);
+            entity.setAclGrantSpecifiedUsers(null);
+            entity.setResourceMountSpecifiedUsers(null);
             entity.setGrantedActionsMask(null);
         }
 
@@ -145,6 +147,8 @@ public class TagServiceImpl implements ITagService {
         List<TagTreeResponse> tagTreeResponseList = allTags.stream().map(entity -> {
             TagTreeResponse tagTreeResponse = new TagTreeResponse();
             BeanUtil.copyProperties(entity, tagTreeResponse);
+            int grantedActionsMask = entity.getGrantedActionsMask() == null ? 0 : entity.getGrantedActionsMask();
+            tagTreeResponse.setGrantedActions(ResourceAction.permissionCodeToActions(grantedActionsMask));
             tagTreeResponse.setChildren(new ArrayList<>());
             return tagTreeResponse;
         }).collect(Collectors.toList());
@@ -187,17 +191,25 @@ public class TagServiceImpl implements ITagService {
 
         // 是否有权限变更
         boolean isPermissionChanged = false;
+        boolean isMountModeChanged = false;
+        boolean isMountListChanged = false;
         if (tagUpdateRequest.getAclGrantMode() != null && !tagUpdateRequest.getAclGrantMode().equals(entity.getAclGrantMode())) {
             isPermissionChanged = true;
         }
-        if (tagUpdateRequest.getSpecifiedUsers() != null && !tagUpdateRequest.getSpecifiedUsers().equals(entity.getSpecifiedUsers())) {
+        if (tagUpdateRequest.getResourceMountMode() != null && !tagUpdateRequest.getResourceMountMode().equals(entity.getResourceMountMode())) {
+            isMountModeChanged = true;
+        }
+        if (tagUpdateRequest.getResourceMountSpecifiedUsers() != null && !tagUpdateRequest.getResourceMountSpecifiedUsers().equals(entity.getResourceMountSpecifiedUsers())) {
+            isMountListChanged = true;
+        }
+        if (tagUpdateRequest.getAclGrantSpecifiedUsers() != null && !tagUpdateRequest.getAclGrantSpecifiedUsers().equals(entity.getAclGrantSpecifiedUsers())) {
             isPermissionChanged = true;
         }
         if (tagUpdateRequest.getGrantedActions() != null && ResourceAction.actionsToPermissionCode(tagUpdateRequest.getGrantedActions()) != entity.getGrantedActionsMask()) {
             isPermissionChanged = true;
         }
 
-        if (groupID.startsWith(ResourceConstants.PERSONAL_GROUP_PREFIX) && isPermissionChanged){
+        if (groupID.startsWith(ResourceConstants.PERSONAL_GROUP_PREFIX) && (isPermissionChanged || isMountModeChanged || isMountListChanged)){
             throw new ServiceException(CANNOT_SET_VISIBILITY); // 个人组标签不能设置标签权限
         }
 
