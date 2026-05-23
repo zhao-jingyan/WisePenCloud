@@ -3,6 +3,7 @@ package com.oriole.wisepen.system.controller;
 import com.oriole.wisepen.system.api.domain.dto.SysOperLogDTO;
 import com.oriole.wisepen.system.service.SysOperLogService;
 import com.oriole.wisepen.common.core.domain.R;
+import io.swagger.v3.oas.annotations.Hidden;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -12,6 +13,7 @@ import org.springframework.web.bind.annotation.*;
  */
 @RestController
 @RequestMapping("/system/log") // 注意这里的基础路径
+@Hidden
 public class RemoteLogController {
 
     @Autowired

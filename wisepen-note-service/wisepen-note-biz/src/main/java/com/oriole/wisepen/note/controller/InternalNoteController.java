@@ -4,6 +4,7 @@ import com.oriole.wisepen.common.core.domain.R;
 import com.oriole.wisepen.note.api.domain.dto.res.NoteSnapshotResponse;
 import com.oriole.wisepen.note.api.feign.RemoteNoteService;
 import com.oriole.wisepen.note.service.INoteVersionService;
+import io.swagger.v3.oas.annotations.Hidden;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -14,6 +15,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/internal/note")
 @RequiredArgsConstructor
+@Hidden
 public class InternalNoteController implements RemoteNoteService {
 
     private final INoteVersionService noteVersionService;

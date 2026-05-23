@@ -10,6 +10,8 @@ import com.oriole.wisepen.user.api.domain.dto.req.AuthPwdResetRequest;
 import com.oriole.wisepen.user.api.domain.dto.req.AuthPwdResetVerifyRequest;
 import com.oriole.wisepen.user.service.AuthService;
 import com.oriole.wisepen.user.service.IUserService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
@@ -21,12 +23,14 @@ import static com.oriole.wisepen.common.core.constant.SecurityConstants.AUTHORIZ
 @RestController
 @RequestMapping("/auth")
 @RequiredArgsConstructor
+@Tag(name = "认证服务", description = "登录、登出、注册与密码重置")
 public class AuthController {
 
     private final AuthService authService;
     private final IUserService userService;
 
     @PostMapping("/login")
+    @Operation(summary = "登录", operationId = "authLogin")
     public R<String> login(@Valid @RequestBody AuthLoginRequest loginRequest, HttpServletResponse response) {
         String sessionId = authService.login(loginRequest);
 
@@ -38,6 +42,7 @@ public class AuthController {
 
     @CheckLogin
     @PostMapping("/logout")
+    @Operation(summary = "登出", operationId = "authLogout")
     public R<Void> logout(HttpServletResponse response) {
         String sessionId = SecurityContextHolder.getUserAuthToken();
 
@@ -61,18 +66,21 @@ public class AuthController {
     }
 
     @PostMapping("/register")
+    @Operation(summary = "注册", operationId = "authRegister")
     public R<String> register(@Valid @RequestBody AuthRegisterRequest req) {
         userService.register(req);
         return R.ok();
     }
 
     @PostMapping("/sendResetMail")
+    @Operation(summary = "发送重置密码邮件", operationId = "authSendResetMail")
     public R<Void> sendResetMail(@Valid @RequestBody AuthPwdResetVerifyRequest req) {
         userService.sendResetMail(req);
         return R.ok();
     }
 
     @PostMapping("/resetPassword")
+    @Operation(summary = "重置密码", operationId = "authResetPassword")
     public R<Void> resetPassword(@Valid @RequestBody AuthPwdResetRequest req) {
         userService.resetPassword(req);
         return R.ok();

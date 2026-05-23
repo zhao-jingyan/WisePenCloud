@@ -5,12 +5,14 @@ import com.oriole.wisepen.common.core.exception.ServiceException;
 import com.oriole.wisepen.extension.fudan.cache.RedisCacheManager;
 import com.oriole.wisepen.extension.fudan.domain.dto.FudanUISTaskResultDTO;
 import com.oriole.wisepen.extension.fudan.exception.FudanExtensionError;
+import io.swagger.v3.oas.annotations.Hidden;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/internal/extenion/fudan/uis")
 @RequiredArgsConstructor
+@Hidden
 public class UISTaskController {
 
     private final RedisCacheManager redisCacheManager;

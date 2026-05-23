@@ -1,4 +1,5 @@
 com.oriole.wisepen.common.config.WisepenWebAutoConfiguration
+com.oriole.wisepen.common.config.WisepenOpenApiAutoConfiguration
 com.oriole.wisepen.common.gray.DeveloperIsolationAutoConfiguration
 com.oriole.wisepen.common.config.GlobalGrayLoadBalancerAutoConfiguration
 com.oriole.wisepen.common.mq.config.ReliablePublisherAutoConfiguration

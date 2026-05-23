@@ -6,6 +6,7 @@ import com.oriole.wisepen.user.api.domain.base.UserDisplayBase;
 import com.oriole.wisepen.user.api.feign.RemoteUserService;
 import com.oriole.wisepen.user.service.IGroupService;
 import com.oriole.wisepen.user.service.IUserService;
+import io.swagger.v3.oas.annotations.Hidden;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -18,6 +19,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/internal")
 @RequiredArgsConstructor
+@Hidden
 public class InternalController implements RemoteUserService {
 
     private final IUserService userService;
