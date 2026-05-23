@@ -1,5 +1,7 @@
 package com.oriole.wisepen.file.storage.api.enums;
 
+import com.baomidou.mybatisplus.annotation.EnumValue;
+import com.oriole.wisepen.common.core.domain.enums.WisePenEnum;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 
@@ -8,13 +10,17 @@ import lombok.Getter;
  */
 @Getter
 @AllArgsConstructor
-public enum StorageSceneEnum {
+public enum StorageSceneEnum implements WisePenEnum {
 
-    PUBLIC_IMAGE_FOR_USER("public/images/user"),    // 公开图床 (如头像、文章插图，无需鉴权即可访问)
-    PUBLIC_IMAGE_FOR_GROUP("public/images"),
+    PUBLIC_IMAGE_FOR_USER(1, "PUBLIC_IMAGE_FOR_USER", "PUBLIC_IMAGE_FOR_USER", "public/images/user"),    // 公开图床 (如头像、文章插图，无需鉴权即可访问)
+    PUBLIC_IMAGE_FOR_GROUP(2, "PUBLIC_IMAGE_FOR_GROUP", "PUBLIC_IMAGE_FOR_GROUP", "public/images"),
     // TODO:public/images/note 是权宜之计，应在Q2改为 private/images/note
-    PRIVATE_IMAGE_FOR_NOTE("public/images/note"),  // 私密图床 (如笔记中的图片，需 STS Token 访问)
-    PRIVATE_DOC("private/docs");      // 文档 (如 PDF、Word，永远在私有域)
+    PRIVATE_IMAGE_FOR_NOTE(3, "PRIVATE_IMAGE_FOR_NOTE", "PRIVATE_IMAGE_FOR_NOTE", "public/images/note"),  // 私密图床 (如笔记中的图片，需 STS Token 访问)
+    PRIVATE_DOC(4, "PRIVATE_DOC", "PRIVATE_DOC", "private/docs");      // 文档 (如 PDF、Word，永远在私有域)
 
+    @EnumValue
+    private final Integer code;
+    private final String value;
+    private final String desc;
     private final String prefix;
 }

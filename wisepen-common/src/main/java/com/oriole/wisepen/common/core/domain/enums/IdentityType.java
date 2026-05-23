@@ -1,7 +1,6 @@
 package com.oriole.wisepen.common.core.domain.enums;
 
 import com.baomidou.mybatisplus.annotation.EnumValue;
-import com.fasterxml.jackson.annotation.JsonValue;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 
@@ -9,16 +8,16 @@ import java.util.Arrays;
 
 @Getter
 @AllArgsConstructor
-public enum IdentityType {
+public enum IdentityType implements WisePenEnum {
 
-    STUDENT(1, "STUDENT"),
-    TEACHER(2, "TEACHER"),
-    ADMIN(3, "ADMIN");
+    STUDENT(1, 1, "STUDENT"),
+    TEACHER(2, 2, "TEACHER"),
+    ADMIN(3, 3, "ADMIN");
 
     @EnumValue
-    @JsonValue
-    private final int code;
+    private final Integer code;
 
+    private final Integer value;
     private final String desc;
 
     /**
@@ -27,7 +26,7 @@ public enum IdentityType {
     public static IdentityType getByCode(Integer code) {
         if (code == null) {return null;}
         return Arrays.stream(values())
-                .filter(t -> t.getCode() == code)
+                .filter(t -> t.getCode().equals(code))
                 .findFirst()
                 .orElse(null);
     }

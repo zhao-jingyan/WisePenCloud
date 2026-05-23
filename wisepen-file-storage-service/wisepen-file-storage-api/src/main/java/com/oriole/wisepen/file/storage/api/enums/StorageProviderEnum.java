@@ -1,10 +1,22 @@
 package com.oriole.wisepen.file.storage.api.enums;
 
+import com.baomidou.mybatisplus.annotation.EnumValue;
+import com.oriole.wisepen.common.core.domain.enums.WisePenEnum;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+
 /**
  * 存储提供商枚举
  */
-public enum StorageProviderEnum {
-    ALIYUN_OSS,
-    MINIO,
-    TENCENT_COS;
+@Getter
+@AllArgsConstructor
+public enum StorageProviderEnum implements WisePenEnum {
+    ALIYUN_OSS(1, "ALIYUN_OSS", "ALIYUN_OSS"),
+    MINIO(2, "MINIO", "MINIO"),
+    TENCENT_COS(3, "TENCENT_COS", "TENCENT_COS");
+
+    @EnumValue
+    private final Integer code;
+    private final String value;
+    private final String desc;
 }

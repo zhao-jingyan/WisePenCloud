@@ -3,6 +3,7 @@ package com.oriole.wisepen.resource.enums;
 import com.baomidou.mybatisplus.annotation.EnumValue;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonValue;
+import com.oriole.wisepen.common.core.domain.enums.WisePenEnum;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 
@@ -23,29 +24,32 @@ import java.util.Map;
  */
 @Getter
 @AllArgsConstructor
-public enum ResourceType {
+public enum ResourceType implements WisePenEnum {
 
     /** 无扩展名的笔记，由笔记服务管理，不经过文件上传流程 */
-    NOTE("note"),
-    PDF("pdf"),
-    DOC("doc"),
-    DOCX("docx"),
-    PPT("ppt"),
-    PPTX("pptx"),
-    XLS("xls"),
-    XLSX("xlsx"),
-    UNKNOWN("unknown");
+    NOTE(1, "note", "NOTE"),
+    PDF(2, "pdf", "PDF"),
+    DOC(3, "doc", "DOC"),
+    DOCX(4, "docx", "DOCX"),
+    PPT(5, "ppt", "PPT"),
+    PPTX(6, "pptx", "PPTX"),
+    XLS(7, "xls", "XLS"),
+    XLSX(8, "xlsx", "XLSX"),
+    UNKNOWN(99, "unknown", "UNKNOWN");
 
-    /** 枚举标识值（文件类扩展名小写，NOTE 使用逻辑标识），同时作为 DB 存储值和 JSON 序列化值 */
+    /** 稳定数字码 */
+    private final Integer code;
+    /** 文件类扩展名小写，NOTE 使用逻辑标识，同时作为 DB 存储值和 JSON 序列化值 */
     @EnumValue
     @JsonValue
-    private final String extension;
+    private final String value;
+    private final String desc;
 
     private static final Map<String, ResourceType> EXT_MAP = new HashMap<>();
 
     static {
         for (ResourceType e : values()) {
-            EXT_MAP.put(e.extension, e);
+            EXT_MAP.put(e.value, e);
         }
     }
 
