@@ -1,9 +1,8 @@
 package com.oriole.wisepen.system.service.impl;
 
-import com.oriole.wisepen.common.core.domain.R;
 import com.oriole.wisepen.common.core.exception.ServiceException;
 import com.oriole.wisepen.system.api.domain.dto.MailSendDTO;
-import com.oriole.wisepen.system.excpetion.SysErrorCode;
+import com.oriole.wisepen.system.excpetion.SysError;
 import com.oriole.wisepen.system.service.SysMailService;
 import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
@@ -50,7 +49,7 @@ public class SysMailServiceImpl implements SysMailService {
         } catch (Exception e) {
             String err = String.format("Email sending failed: To=%s, Subject=%s, Err=%s", mailSendDTO.getToEmail(), mailSendDTO.getSubject(), e.getMessage());
             log.error(err, e);
-            throw new ServiceException(SysErrorCode.MAIL_SEND_ERROR);
+            throw new ServiceException(SysError.MAIL_SEND_FAILED);
         }
     }
 }

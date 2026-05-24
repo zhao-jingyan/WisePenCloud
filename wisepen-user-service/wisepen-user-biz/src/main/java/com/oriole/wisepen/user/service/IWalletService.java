@@ -1,6 +1,6 @@
 package com.oriole.wisepen.user.service;
 
-import com.oriole.wisepen.common.core.domain.PageResult;
+import com.oriole.wisepen.common.core.domain.PageR;
 import com.oriole.wisepen.user.api.domain.dto.req.WalletTransferTokenRequest;
 import com.oriole.wisepen.user.api.domain.dto.res.WalletDetailResponse;
 import com.oriole.wisepen.user.api.enums.TokenPayerType;
@@ -37,7 +37,7 @@ public interface IWalletService {
     void redeemVoucher(Long userId, String voucherCode);
 
     //获取交易流水
-    PageResult<WalletTransactionRecordResponse> listTransactions(
+    PageR<WalletTransactionRecordResponse> listTransactions(
             TokenPayerType payerType,
             Long payerId,
             TokenTransactionType tokenTransactionType,
@@ -48,5 +48,5 @@ public interface IWalletService {
     WalletDetailResponse getUserWalletInfo(Long userId);
 
     // 批量获得用户所有小组的 Token 信息
-    PageResult<GroupMemberTokenDetailResponse> getAllGroupTokenInfoByUserId(Long userId, Integer page, Integer size);
+    PageR<GroupMemberTokenDetailResponse> getAllGroupTokenInfoByUserId(Long userId, Integer page, Integer size);
 }

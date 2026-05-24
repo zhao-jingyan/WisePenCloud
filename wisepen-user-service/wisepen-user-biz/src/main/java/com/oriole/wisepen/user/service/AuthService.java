@@ -5,7 +5,7 @@ import cn.hutool.crypto.digest.BCrypt;
 import com.oriole.wisepen.common.core.exception.ServiceException;
 import com.oriole.wisepen.user.api.enums.Status;
 import com.oriole.wisepen.user.cache.RedisCacheManager;
-import com.oriole.wisepen.user.exception.UserErrorCode;
+import com.oriole.wisepen.user.exception.UserError;
 import com.oriole.wisepen.user.api.domain.dto.req.AuthLoginRequest;
 import com.oriole.wisepen.user.domain.entity.UserEntity;
 import lombok.RequiredArgsConstructor;
@@ -30,17 +30,17 @@ public class AuthService {
 
         // 账号不存在
         if (user==null){
-            throw new ServiceException(UserErrorCode.USER_PASSWORD_ERROR);
+            throw new ServiceException(UserError.AUTH_USERNAME_OR_PASSWORD_INVALID);
         }
 
         // 校验账号状态
         if (user.getStatus()== Status.BANNED) {
-            throw new ServiceException(UserErrorCode.USER_LOCKED);
+            throw new ServiceException(UserError.AUTH_USER_LOCKED);
         }
 
         // 校验密码
         if (!BCrypt.checkpw(loginRequest.getPassword(), user.getPassword())) {
-            throw new ServiceException(UserErrorCode.USER_PASSWORD_ERROR);
+            throw new ServiceException(UserError.AUTH_USERNAME_OR_PASSWORD_INVALID);
         }
 
         Map<String, Integer> groupRoleMap = groupMemberService.getGroupRoleMapByUserId(user.getUserId());

@@ -3,7 +3,7 @@ package com.oriole.wisepen.file.storage.strategy;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.oriole.wisepen.common.core.exception.ServiceException;
 import com.oriole.wisepen.file.storage.domain.entity.StorageConfigEntity;
-import com.oriole.wisepen.file.storage.exception.StorageErrorCode;
+import com.oriole.wisepen.file.storage.exception.FileStorageError;
 import com.oriole.wisepen.file.storage.mapper.StorageConfigMapper;
 import com.oriole.wisepen.file.storage.strategy.aliyun.AliyunOssProvider;
 import jakarta.annotation.PostConstruct;
@@ -73,7 +73,7 @@ public class StorageManager {
             case ALIYUN_OSS -> new AliyunOssProvider(config);
             // 预留其他云厂商的扩展口
             // case MINIO -> new MinioProvider(config);
-            default -> throw new ServiceException(StorageErrorCode.PROVIDER_NOT_SUPPORTED);
+            default -> throw new ServiceException(FileStorageError.CANNOT_SUPPORT_STORAGE_PROVIDER);
         };
     }
 
@@ -83,7 +83,7 @@ public class StorageManager {
     public StorageProvider getPrimaryProvider() {
         StorageProvider provider = providerCache.get(primaryConfigId);
         if (provider == null) {
-            throw new ServiceException(StorageErrorCode.PROVIDER_NOT_SUPPORTED);
+            throw new ServiceException(FileStorageError.CANNOT_SUPPORT_STORAGE_PROVIDER);
         }
         return provider;
     }
@@ -97,7 +97,7 @@ public class StorageManager {
         }
         StorageProvider provider = providerCache.get(configId);
         if (provider == null) {
-            throw new ServiceException(StorageErrorCode.PROVIDER_NOT_SUPPORTED);
+            throw new ServiceException(FileStorageError.CANNOT_SUPPORT_STORAGE_PROVIDER);
         }
         return provider;
     }
@@ -112,7 +112,7 @@ public class StorageManager {
                 return provider;
             }
         }
-        throw new ServiceException(StorageErrorCode.INVALID_URL_FORMAT);
+        throw new ServiceException(FileStorageError.FILE_URL_INVALID);
     }
 
     /**

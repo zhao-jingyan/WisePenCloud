@@ -6,7 +6,7 @@ import com.oriole.wisepen.common.core.exception.ServiceException;
 import com.oriole.wisepen.common.security.annotation.CheckLogin;
 import com.oriole.wisepen.file.storage.api.domain.dto.StorageRecordDTO;
 import com.oriole.wisepen.file.storage.api.enums.StorageSceneEnum;
-import com.oriole.wisepen.file.storage.exception.StorageErrorCode;
+import com.oriole.wisepen.file.storage.exception.FileStorageError;
 import com.oriole.wisepen.file.storage.service.IStorageService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -39,10 +39,10 @@ public class StorageController {
 
         String extension = FileUtil.extName(file.getOriginalFilename()).toLowerCase();
         if (!Arrays.asList("jpg", "jpeg", "png", "gif", "webp").contains(extension)) {
-            throw new ServiceException(StorageErrorCode.FILE_TYPE_UNSUPPORTED);
+            throw new ServiceException(FileStorageError.CANNOT_SUPPORT_FILE_TYPE);
         }
         if (!EnumSet.of(PUBLIC_IMAGE_FOR_USER, PUBLIC_IMAGE_FOR_GROUP, PRIVATE_IMAGE_FOR_NOTE).contains(scene)) {
-            throw new ServiceException(StorageErrorCode.SCENE_TYPE_UNSUPPORTED);
+            throw new ServiceException(FileStorageError.CANNOT_SUPPORT_FILE_STORAGE_SCENE);
         }
         StorageRecordDTO record = storageService.uploadSmallFileProxy(file, scene, bizTag);
         return R.ok(record);

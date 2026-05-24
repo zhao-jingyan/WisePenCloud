@@ -20,7 +20,7 @@ public enum GroupRoleType {
     @JsonValue
     private final int code;
 
-    private final String desc;
+    private final String value;
 
     public static GroupRoleType getByCode(Integer code) {
         if (code == null) {return null;}

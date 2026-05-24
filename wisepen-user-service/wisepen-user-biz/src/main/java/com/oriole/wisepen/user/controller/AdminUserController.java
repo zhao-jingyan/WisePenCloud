@@ -1,7 +1,7 @@
 package com.oriole.wisepen.user.controller;
 
 import com.oriole.wisepen.common.core.domain.R;
-import com.oriole.wisepen.common.core.domain.PageResult;
+import com.oriole.wisepen.common.core.domain.PageR;
 import com.oriole.wisepen.common.core.domain.enums.BusinessType;
 import com.oriole.wisepen.common.log.annotation.Log;
 import com.oriole.wisepen.common.security.annotation.CheckRole;
@@ -25,7 +25,7 @@ public class AdminUserController {
 
     @GetMapping("/getUserList")
     @Log(title = "管理员查询用户列表", businessType = BusinessType.SELECT)
-    public R<PageResult<UserEntity>> getUserList(
+    public R<PageR<UserEntity>> getUserList(
             @RequestParam(value = "page", defaultValue = "1") int page,
             @RequestParam(value = "size", defaultValue = "20") int size,
             @RequestParam String keyword,

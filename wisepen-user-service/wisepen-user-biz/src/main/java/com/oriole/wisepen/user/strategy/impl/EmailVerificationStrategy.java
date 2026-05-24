@@ -12,7 +12,7 @@ import com.oriole.wisepen.user.api.enums.Status;
 import com.oriole.wisepen.user.api.enums.UserVerificationMode;
 import com.oriole.wisepen.user.cache.RedisCacheManager;
 import com.oriole.wisepen.user.domain.entity.UserEntity;
-import com.oriole.wisepen.user.exception.UserErrorCode;
+import com.oriole.wisepen.user.exception.UserError;
 import com.oriole.wisepen.user.mapper.UserMapper;
 import com.oriole.wisepen.user.strategy.UserVerificationStrategy;
 import lombok.RequiredArgsConstructor;
@@ -49,7 +49,7 @@ public class EmailVerificationStrategy implements UserVerificationStrategy {
 
         if (StrUtil.isBlank(email) || !email.matches("^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.edu(\\.cn)?$")) {
             log.warn("邮箱格式错误或非教育邮箱: {}", email);
-            throw new ServiceException(UserErrorCode.USER_VERIFICATION_EMAIL_FORMAT_ERROR);
+            throw new ServiceException(UserError.VERIFICATION_EMAIL_INVALID);
         }
 
         long existed = userMapper.selectCount(Wrappers.<UserEntity>lambdaQuery()
@@ -59,7 +59,7 @@ public class EmailVerificationStrategy implements UserVerificationStrategy {
 
         if (existed > 0) {
             log.warn("发起邮箱验证失败：邮箱 {} 已被其他账号绑定", email);
-            throw new ServiceException(UserErrorCode.USER_VERIFICATION_EMAIL_EXISTED);
+            throw new ServiceException(UserError.VERIFICATION_EMAIL_ALREADY_EXISTS);
         }
 
         String token = redisCacheManager.setEmailVerificationCode(email, userId);
@@ -81,7 +81,7 @@ public class EmailVerificationStrategy implements UserVerificationStrategy {
             log.info("Verify email sent. userId={}, email={}", userId, email);
         } catch (Exception e) {
             log.error("Verify email sending failed.", e);
-            throw new ServiceException(UserErrorCode.EMAIL_SEND_ERROR);
+            throw new ServiceException(UserError.VERIFICATION_EMAIL_SEND_FAILED);
         }
     }
 
@@ -89,7 +89,7 @@ public class EmailVerificationStrategy implements UserVerificationStrategy {
     public VerificationResultDTO verify(Map<String, Object> payload) {
         ImmutablePair<Long, String> verfiyInfo = redisCacheManager.getEmailVerificationUser((String) payload.get("token"));
         if (verfiyInfo == null) {
-            throw new ServiceException(UserErrorCode.USER_VERIFICATION_EMAIL_TOKEN_NO_EXISTED);
+            throw new ServiceException(UserError.VERIFICATION_EMAIL_TOKEN_EXPIRED);
         }
         Long userId = verfiyInfo.left;
         String email = verfiyInfo.right;
@@ -102,7 +102,7 @@ public class EmailVerificationStrategy implements UserVerificationStrategy {
 
         if (existed > 0) {
             log.warn("邮箱验证回调失败：邮箱 {} 已被其他已验证账号占用，userId={}", email, userId);
-            throw new ServiceException(UserErrorCode.USER_VERIFICATION_EMAIL_EXISTED);
+            throw new ServiceException(UserError.VERIFICATION_EMAIL_ALREADY_EXISTS);
         }
 
         UserEntity userEntity = new UserEntity();

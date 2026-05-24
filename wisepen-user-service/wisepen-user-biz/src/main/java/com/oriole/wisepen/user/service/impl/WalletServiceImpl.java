@@ -8,7 +8,7 @@ import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.toolkit.CollectionUtils;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.oriole.wisepen.common.core.domain.PageResult;
+import com.oriole.wisepen.common.core.domain.PageR;
 import com.oriole.wisepen.user.api.domain.base.UserDisplayBase;
 import com.oriole.wisepen.user.api.domain.dto.req.WalletTransferTokenRequest;
 import com.oriole.wisepen.user.api.enums.*;
@@ -22,8 +22,7 @@ import com.oriole.wisepen.user.api.domain.mq.TokenConsumptionMessage;
 import com.oriole.wisepen.user.cache.RedisCacheManager;
 import com.oriole.wisepen.user.domain.entity.*;
 import com.oriole.wisepen.user.event.GroupTokenConsumeEvent;
-import com.oriole.wisepen.user.exception.GroupErrorCode;
-import com.oriole.wisepen.user.exception.UserErrorCode;
+import com.oriole.wisepen.user.exception.UserError;
 import com.oriole.wisepen.user.mapper.*;
 import com.oriole.wisepen.user.service.IWalletService;
 import lombok.RequiredArgsConstructor;
@@ -67,7 +66,7 @@ public class WalletServiceImpl implements IWalletService {
         Integer tokenBill = message.getUsageTokens() * message.getBillingRatio();
         String billMeta = "%s (%s | %d Tokens x%s )".formatted(
                 message.getModelName(),
-                message.getModelType().getDesc(),
+                message.getModelType().getValue(),
                 message.getUsageTokens(),
                 message.getBillingRatio()
         );
@@ -85,11 +84,11 @@ public class WalletServiceImpl implements IWalletService {
     public void changeGroupTokenBalance(Long groupId, Long operator, Integer changedToken, TokenTransactionType type, String Meta) {
         GroupEntity group = groupMapper.selectById(groupId);
         if (group == null) {
-            throw new ServiceException(GroupErrorCode.GROUP_NOT_EXIST);
+            throw new ServiceException(UserError.GROUP_NOT_EXIST);
         }
 
         if (GroupType.NORMAL_GROUP.equals(group.getGroupType())) {
-            throw new ServiceException(GroupErrorCode.GROUP_HAS_NO_QUOTA);
+            throw new ServiceException(UserError.CANNOT_CONFIGURE_GROUP_WALLET_QUOTA);
         }
 
         LambdaUpdateWrapper<GroupEntity> wrapper = new LambdaUpdateWrapper<>();
@@ -116,9 +115,6 @@ public class WalletServiceImpl implements IWalletService {
     // 改变个人 Token 余额
     public void changeUserTokenBalance(Long userId, Long operator, Integer changedToken, TokenTransactionType type, String Meta) {
         UserWalletEntity walletEntity = userWalletsMapper.selectById(userId);
-        if (walletEntity == null) {
-            throw new ServiceException(UserErrorCode.USER_NOT_EXIST);
-        }
 
         LambdaUpdateWrapper<UserWalletEntity> wrapper = new LambdaUpdateWrapper<>();
         wrapper.eq(UserWalletEntity::getUserId, userId)
@@ -145,10 +141,10 @@ public class WalletServiceImpl implements IWalletService {
     // 更新组成员 Token 配额
     public void updateGroupMemberTokenLimit(GroupMemberTokenLimitUpdateRequest req) {
         GroupEntity group = groupMapper.selectById(req.getGroupId());
-        if (group == null) throw new ServiceException(GroupErrorCode.GROUP_NOT_EXIST);
+        if (group == null) throw new ServiceException(UserError.GROUP_NOT_EXIST);
 
         if (GroupType.NORMAL_GROUP.equals(group.getGroupType())) {
-            throw new ServiceException(GroupErrorCode.GROUP_HAS_NO_QUOTA);
+            throw new ServiceException(UserError.CANNOT_CONFIGURE_GROUP_WALLET_QUOTA);
         }
 
         // 批量更新额度，并防降额击穿
@@ -162,7 +158,7 @@ public class WalletServiceImpl implements IWalletService {
         int rows = groupMemberMapper.update(null, wrapper);
 
         if (rows == 0) {
-            throw new ServiceException(GroupErrorCode.LIMIT_CANNOT_BE_LOWER_THAN_USED);
+            throw new ServiceException(UserError.WALLET_TOKEN_LIMIT_BELOW_USED);
         }
 
         LambdaQueryWrapper<GroupMemberEntity> queryWrapper = new LambdaQueryWrapper<>();
@@ -280,17 +276,17 @@ public class WalletServiceImpl implements IWalletService {
         UserWalletEntity userWalletEntity = userWalletsMapper.selectById(userId);
 
         if (GroupType.ADVANCED_GROUP != groupEntity.getGroupType()) {
-            throw new ServiceException(GroupErrorCode.GROUP_HAS_NO_QUOTA);
+            throw new ServiceException(UserError.CANNOT_CONFIGURE_GROUP_WALLET_QUOTA);
         }
 
         switch (tokenTransferType) {
             case GROUP_INFLOW:
-                if (userWalletEntity.getTokenBalance() < tokenCount) throw new ServiceException(GroupErrorCode.LIMIT_CANNOT_BE_LOWER_THAN_USED);
+                if (userWalletEntity.getTokenBalance() < tokenCount) throw new ServiceException(UserError.WALLET_TOKEN_LIMIT_BELOW_USED);
                 this.changeUserTokenBalance(userId, userId, -tokenCount, TokenTransactionType.TRANSFER_OUT, null);
                 this.changeGroupTokenBalance(groupId, userId, tokenCount, TokenTransactionType.TRANSFER_IN, null);
                 break;
             case USER_INFLOW:
-                if (groupEntity.getTokenBalance() < tokenCount) throw new ServiceException(GroupErrorCode.LIMIT_CANNOT_BE_LOWER_THAN_USED);
+                if (groupEntity.getTokenBalance() < tokenCount) throw new ServiceException(UserError.WALLET_TOKEN_LIMIT_BELOW_USED);
                 this.changeUserTokenBalance(userId, userId, tokenCount, TokenTransactionType.TRANSFER_IN, null);
                 this.changeGroupTokenBalance(groupId, userId, -tokenCount, TokenTransactionType.TRANSFER_OUT, null);
                 break;
@@ -303,11 +299,11 @@ public class WalletServiceImpl implements IWalletService {
         TokenVoucherEntity voucher = tokenVoucherMapper.selectOne(wrapper);
 
         // 兑换券不存在
-        if (voucher==null) throw new ServiceException(GroupErrorCode.VOUCHER_NOT_EXIST);
+        if (voucher==null) throw new ServiceException(UserError.WALLET_VOUCHER_NOT_FOUND);
         // 兑换券已被使用
-        if (voucher.getStatus() == VoucherStatus.USED) throw new ServiceException(GroupErrorCode.VOUCHER_IS_USED);
+        if (voucher.getStatus() == VoucherStatus.USED) throw new ServiceException(UserError.WALLET_VOUCHER_INVALID);
         // 兑换券已过期
-        if (voucher.getExpireTime() != null && !LocalDateTime.now().isBefore(voucher.getExpireTime())) throw new ServiceException(GroupErrorCode.VOUCHER_IS_EXPIRED);
+        if (voucher.getExpireTime() != null && !LocalDateTime.now().isBefore(voucher.getExpireTime())) throw new ServiceException(UserError.WALLET_VOUCHER_EXPIRED);
 
         String voucherCodeMasked = "****-****-****-" + voucherCode.substring(voucherCode.length() - 4);
         // 先消费 Voucher
@@ -320,14 +316,14 @@ public class WalletServiceImpl implements IWalletService {
         );
         if (row == 0) {
             // 未能成功消费，可能已被使用
-            throw new ServiceException(GroupErrorCode.VOUCHER_IS_USED);
+            throw new ServiceException(UserError.WALLET_VOUCHER_INVALID);
         }
         // 执行充值
         this.changeUserTokenBalance(userId, userId, voucher.getAmount(), TokenTransactionType.REFILL, voucherCodeMasked);
     }
 
     @Override
-    public PageResult<WalletTransactionRecordResponse> listTransactions(
+    public PageR<WalletTransactionRecordResponse> listTransactions(
             TokenPayerType payerType,
             Long payerId,
             TokenTransactionType tokenTransactionType,
@@ -342,9 +338,9 @@ public class WalletServiceImpl implements IWalletService {
 
         IPage<TokenTransactionRecordEntity> transactionPage = tokenTransactionRecordMapper.selectPage(pageParam, wrapper);
 
-        PageResult<WalletTransactionRecordResponse> pageResult = new PageResult<>(transactionPage.getTotal(), page, size);
+        PageR<WalletTransactionRecordResponse> pageR = new PageR<>(transactionPage.getTotal(), page, size);
         if (CollectionUtils.isEmpty(transactionPage.getRecords())) {
-            return pageResult;
+            return pageR;
         }
 
         // 提取所有不为空的 operatorId，去重收集到 Set 中
@@ -368,8 +364,8 @@ public class WalletServiceImpl implements IWalletService {
                     return response;
                 })
                 .collect(Collectors.toList());
-        pageResult.addAll(records);
-        return pageResult;
+        pageR.addAll(records);
+        return pageR;
     }
 
 
@@ -380,7 +376,7 @@ public class WalletServiceImpl implements IWalletService {
     }
 
     @Override
-    public PageResult<GroupMemberTokenDetailResponse> getAllGroupTokenInfoByUserId(Long userId, Integer page, Integer size) {
+    public PageR<GroupMemberTokenDetailResponse> getAllGroupTokenInfoByUserId(Long userId, Integer page, Integer size) {
         Page<GroupMemberEntity> pageParam = new Page<>(page, size);
         LambdaQueryWrapper<GroupMemberEntity> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(GroupMemberEntity::getUserId, userId)
@@ -391,9 +387,9 @@ public class WalletServiceImpl implements IWalletService {
         List<Long> groupIds = memberPage.getRecords().stream()
                 .map(GroupMemberEntity::getGroupId)
                 .collect(Collectors.toList());
-        PageResult<GroupMemberTokenDetailResponse> pageResult = new PageResult<>(memberPage.getTotal(), page, size);
+        PageR<GroupMemberTokenDetailResponse> pageR = new PageR<>(memberPage.getTotal(), page, size);
         if (groupIds.isEmpty()) {
-            return pageResult;
+            return pageR;
         }
 
         Map<Long, GroupEntity> groupEntityMap = groupMapper.selectBatchIds(groupIds).stream()
@@ -405,7 +401,7 @@ public class WalletServiceImpl implements IWalletService {
             return resp;
         }).collect(Collectors.toList());
 
-        pageResult.addAll(records);
-        return pageResult;
+        pageR.addAll(records);
+        return pageR;
     }
 }

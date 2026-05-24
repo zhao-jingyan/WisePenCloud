@@ -23,4 +23,7 @@ public interface ResourceValidationMsg {
     String SIZE_MIN_INVALID = "每页条数不能小于1";
 
     String FILE_ORG_LOGIC_NOT_NULL = "资源组织模式不能为空";
+
+    // 互动相关校验
+    String SCORE_RANGE_INVALID = "评分必须在1到5之间";
 }

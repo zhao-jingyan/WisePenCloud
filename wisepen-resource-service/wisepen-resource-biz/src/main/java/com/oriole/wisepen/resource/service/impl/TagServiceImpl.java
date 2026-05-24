@@ -14,7 +14,7 @@ import com.oriole.wisepen.resource.enums.ResourceAction;
 import com.oriole.wisepen.resource.event.TagChangedEvent;
 import com.oriole.wisepen.resource.event.TagDeletedEvent;
 import com.oriole.wisepen.resource.event.TagTrashedEvent;
-import com.oriole.wisepen.resource.exception.ResPermissionErrorCode;
+import com.oriole.wisepen.resource.exception.ResourceError;
 import com.oriole.wisepen.resource.repository.TagRepository;
 import com.oriole.wisepen.resource.service.ITagService;
 import lombok.RequiredArgsConstructor;
@@ -30,7 +30,7 @@ import java.util.stream.Collectors;
 
 import static com.oriole.wisepen.common.core.util.LogIdUtils.summarizeIds;
 import static com.oriole.wisepen.resource.constant.ResourceConstants.TAGS_TRASH_COLLECTION;
-import static com.oriole.wisepen.resource.exception.ResPermissionErrorCode.CANNOT_SET_VISIBILITY;
+import static com.oriole.wisepen.resource.exception.ResourceError.CANNOT_SET_TAG_NODE_VISIBILITY;
 
 @Slf4j
 @Service
@@ -50,17 +50,17 @@ public class TagServiceImpl implements ITagService {
 
         // 禁止在回收站及其子目录下创建任何新节点
         if (isNodeInTrash(groupID, parentId) != TagType.NOT_IN_TRASH) {
-            throw new ServiceException(ResPermissionErrorCode.CANNOT_OPERATE_IN_TRASH);
+            throw new ServiceException(ResourceError.CANNOT_OPERATE_TRASHED_TAG_PATH_NODE);
         }
 
         // 禁止建立系统级保留节点 Tag
         if (ResourceConstants.ROOT_TAG_NAME.equals(tagName) || ResourceConstants.TRASH_TAG_NAME.equals(tagName)) {
-            throw new ServiceException(ResPermissionErrorCode.CANNOT_USE_SYSTEM_RESERVED_NAME);
+            throw new ServiceException(ResourceError.CANNOT_USE_RESERVED_TAG_PATH_NODE_NAME);
         }
 
         // 校验同级重名
         tagRepository.findByGroupIdAndParentIdAndTagName(groupID, parentId, tagName)
-                .ifPresent(t -> { throw new ServiceException(ResPermissionErrorCode.TAG_NAME_DUPLICATE); });
+                .ifPresent(t -> { throw new ServiceException(ResourceError.TAG_NODE_NAME_CONFLICT); });
 
         TagEntity entity = new TagEntity();
 
@@ -81,11 +81,11 @@ public class TagServiceImpl implements ITagService {
         // 计算祖先数组 (核心逻辑)
         if (parentId != null && !"0".equals(parentId)) {
             TagEntity parent = tagRepository.findByGroupIdAndTagId(groupID, parentId)
-                    .orElseThrow(() -> new ServiceException(ResPermissionErrorCode.PARENT_TAG_NOT_FOUND));
+                    .orElseThrow(() -> new ServiceException(ResourceError.PARENT_TAG_NODE_NOT_FOUND));
 
 //            // 跨类型校验，FOLDER Tag只能在FOLDER Tag下创建，Normal Tag只能在Normal Tag下创建
 //            if (!Objects.equals(parent.getIsPath(), entity.getIsPath())) {
-//                throw new ServiceException(ResPermissionErrorCode.CROSS_TYPE_OPERATION_NOT_ALLOWED);
+//                throw new ServiceException(ResPermissionErrorCode.CANNOT_MOVE_TAG_NODE_ACROSS_TAG_TYPE);
 //            }
 
             // 设定Tag身份
@@ -165,28 +165,28 @@ public class TagServiceImpl implements ITagService {
 
         // 严禁修改处于回收站中的任何节点属性
         if (isNodeInTrash(groupID, targetId) == TagType.IN_TRASH) {
-            throw new ServiceException(ResPermissionErrorCode.CANNOT_OPERATE_IN_TRASH);
+            throw new ServiceException(ResourceError.CANNOT_OPERATE_TRASHED_TAG_PATH_NODE);
         }
 
         TagEntity entity = tagRepository.findByGroupIdAndTagId(groupID, targetId)
-                .orElseThrow(() -> new ServiceException(ResPermissionErrorCode.TAG_NOT_FOUND));
+                .orElseThrow(() -> new ServiceException(ResourceError.TAG_NODE_NOT_FOUND));
 
         String newName = tagUpdateRequest.getTagName();
 
         if (newName != null && !newName.equals(entity.getTagName())) {
             // 名称变动时，校验在当前父节点下是否重名
             tagRepository.findByGroupIdAndParentIdAndTagName(groupID, entity.getParentId(), newName)
-                    .ifPresent(t -> { throw new ServiceException(ResPermissionErrorCode.TAG_NAME_DUPLICATE); });
+                    .ifPresent(t -> { throw new ServiceException(ResourceError.TAG_NODE_NAME_CONFLICT); });
         }
 
         // 禁止修改系统级保留 Tag
         if (ResourceConstants.ROOT_TAG_NAME.equals(entity.getTagName()) || ResourceConstants.TRASH_TAG_NAME.equals(entity.getTagName())) {
-            throw new ServiceException(ResPermissionErrorCode.CANNOT_MODIFY_SYSTEM_NODE);
+            throw new ServiceException(ResourceError.CANNOT_MODIFY_SYSTEM_TAG_PATH_NODE);
         }
 
         // 禁止改名为系统级保留节点 Tag
         if (ResourceConstants.ROOT_TAG_NAME.equals(newName) || ResourceConstants.TRASH_TAG_NAME.equals(newName)) {
-            throw new ServiceException(ResPermissionErrorCode.CANNOT_USE_SYSTEM_RESERVED_NAME);
+            throw new ServiceException(ResourceError.CANNOT_USE_RESERVED_TAG_PATH_NODE_NAME);
         }
 
         // 是否有权限变更
@@ -207,8 +207,8 @@ public class TagServiceImpl implements ITagService {
             isPermissionChanged = true;
         }
 
-        if (groupID.startsWith(ResourceConstants.PERSONAL_GROUP_PREFIX) && (isPermissionChanged)){
-            throw new ServiceException(CANNOT_SET_VISIBILITY); // 个人组标签不能设置标签权限
+        if (groupID.startsWith(ResourceConstants.PERSONAL_GROUP_PREFIX) && isPermissionChanged){
+            throw new ServiceException(CANNOT_SET_TAG_NODE_VISIBILITY); // 个人组标签不能设置标签权限
         }
 
         boolean nameChanged = newName != null && !newName.equals(entity.getTagName());
@@ -241,17 +241,17 @@ public class TagServiceImpl implements ITagService {
         // 严禁向回收站内部节点移动Tag
         // 用户可把外面的节点移入回收站
         if (isNodeInTrash(groupID, newParentId) == TagType.IN_TRASH) {
-            throw new ServiceException(ResPermissionErrorCode.CANNOT_OPERATE_IN_TRASH);
+            throw new ServiceException(ResourceError.CANNOT_OPERATE_TRASHED_TAG_PATH_NODE);
         }
 
         // 目标父节点不能是自己
         if (newParentId.equals(targetId)) {
-            throw new ServiceException(ResPermissionErrorCode.CANNOT_MOVE_TO_SELF);
+            throw new ServiceException(ResourceError.CANNOT_MOVE_TAG_NODE_TO_SELF);
         }
 
         // 获取当前节点
         TagEntity targetNode = tagRepository.findByGroupIdAndTagId(groupID, targetId)
-                .orElseThrow(() -> new ServiceException(ResPermissionErrorCode.TAG_NOT_FOUND));
+                .orElseThrow(() -> new ServiceException(ResourceError.TAG_NODE_NOT_FOUND));
 
         String oldParentId = targetNode.getParentId();
 
@@ -262,7 +262,7 @@ public class TagServiceImpl implements ITagService {
 
         // 系统级保留节点禁止移动位置
         if (ResourceConstants.ROOT_TAG_NAME.equals(targetNode.getTagName()) || ResourceConstants.TRASH_TAG_NAME.equals(targetNode.getTagName())) {
-            throw new ServiceException(ResPermissionErrorCode.CANNOT_MODIFY_SYSTEM_NODE);
+            throw new ServiceException(ResourceError.CANNOT_MOVE_SYSTEM_TAG_PATH_NODE);
         }
 
         // 移动到新位置前，校验目标目录下是否有同名节点
@@ -270,7 +270,7 @@ public class TagServiceImpl implements ITagService {
                 .ifPresent(t -> {
                     // 回收站例外，允许有同名节点
                     if (isNodeInTrash(groupID, newParentId) !=  TagType.TRASH) {
-                        throw new ServiceException(ResPermissionErrorCode.TAG_NAME_DUPLICATE);
+                        throw new ServiceException(ResourceError.TAG_NODE_NAME_CONFLICT);
                     }
                 });
 
@@ -279,16 +279,16 @@ public class TagServiceImpl implements ITagService {
         List<String> newParentAncestors = new ArrayList<>();
         if (!"0".equals(newParentId)) {
             TagEntity newParentNode = tagRepository.findByGroupIdAndTagId(groupID, newParentId)
-                    .orElseThrow(() -> new ServiceException(ResPermissionErrorCode.PARENT_TAG_NOT_FOUND));
+                    .orElseThrow(() -> new ServiceException(ResourceError.PARENT_TAG_NODE_NOT_FOUND));
 
             // 跨类型移动校验，防止将 Normal Tag 拖入 FOLDER Tag 或将 FOLDER Tag 拖入 Normal Tag
             if (!Objects.equals(targetNode.getIsPath(), newParentNode.getIsPath())) {
-                throw new ServiceException(ResPermissionErrorCode.CROSS_TYPE_OPERATION_NOT_ALLOWED);
+                throw new ServiceException(ResourceError.CANNOT_MOVE_TAG_NODE_ACROSS_TAG_TYPE);
             }
 
             // 目标父节点不能是自己的子孙节点
             if (newParentNode.getAncestors() != null && newParentNode.getAncestors().contains(targetId)) {
-                throw new ServiceException(ResPermissionErrorCode.CANNOT_MOVE_TO_DESCENDANT);
+                throw new ServiceException(ResourceError.CANNOT_MOVE_TAG_NODE_TO_DESCENDANT);
             }
 
             if (newParentNode.getAncestors() != null) {
@@ -354,11 +354,11 @@ public class TagServiceImpl implements ITagService {
         String targetId = tagDeleteRequest.getTargetTagId();
 
         TagEntity targetNode = tagRepository.findByGroupIdAndTagId(groupID, targetId)
-                .orElseThrow(() -> new ServiceException(ResPermissionErrorCode.TAG_NOT_FOUND));
+                .orElseThrow(() -> new ServiceException(ResourceError.TAG_NODE_NOT_FOUND));
 
         // 系统级保留节点禁止删除
         if (ResourceConstants.ROOT_TAG_NAME.equals(targetNode.getTagName()) || ResourceConstants.TRASH_TAG_NAME.equals(targetNode.getTagName())) {
-            throw new ServiceException(ResPermissionErrorCode.CANNOT_DELETE_SYSTEM_NODE);
+            throw new ServiceException(ResourceError.CANNOT_DELETE_SYSTEM_TAG_PATH_NODE);
         }
 
         // 删除 FOLDER Tag
@@ -366,7 +366,7 @@ public class TagServiceImpl implements ITagService {
                 !Boolean.TRUE.equals(forceDelete) && // 未开启强制删除
                 isNodeInTrash(groupID, targetId) != TagType.IN_TRASH // 不在回收站
         ) {
-            throw new ServiceException(ResPermissionErrorCode.CANNOT_DELETE_PATH_DIRECTLY);
+            throw new ServiceException(ResourceError.CANNOT_DELETE_TAG_PATH_NODE_DIRECTLY);
         }
 
         // 查出即将被删除的 Tag 及其所有子孙节点的 ID 列表

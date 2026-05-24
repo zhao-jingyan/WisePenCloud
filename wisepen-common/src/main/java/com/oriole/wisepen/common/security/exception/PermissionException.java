@@ -1,16 +1,12 @@
 package com.oriole.wisepen.common.security.exception;
 
+import com.oriole.wisepen.common.core.exception.ServiceException;
 import lombok.Getter;
 
 @Getter
-public class PermissionException extends RuntimeException {
+public class PermissionException extends ServiceException {
 
-    private final Integer code;
-    private final String type;
-
-    public PermissionException(PermissionErrorCode errorCode) {
-        super(errorCode.getMsg());
-        this.type = errorCode.name();
-        this.code = errorCode.getCode();
+    public PermissionException(PermissionError errorCode) {
+        super(errorCode);
     }
 }

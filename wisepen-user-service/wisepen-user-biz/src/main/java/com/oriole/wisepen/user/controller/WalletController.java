@@ -1,7 +1,7 @@
 package com.oriole.wisepen.user.controller;
 
 import com.oriole.wisepen.common.core.context.SecurityContextHolder;
-import com.oriole.wisepen.common.core.domain.PageResult;
+import com.oriole.wisepen.common.core.domain.PageR;
 import com.oriole.wisepen.common.core.domain.R;
 import com.oriole.wisepen.common.core.domain.enums.GroupRoleType;
 import com.oriole.wisepen.common.security.annotation.CheckLogin;
@@ -49,7 +49,7 @@ public class WalletController {
     }
 
     @GetMapping("/listTransactions")
-    public R<PageResult<WalletTransactionRecordResponse>> listTransactions(
+    public R<PageR<WalletTransactionRecordResponse>> listTransactions(
             @RequestParam(value = "groupId", required = false) Long groupId,
             @RequestParam(value = "type", required = false) TokenTransactionType tokenTransactionType,
             @RequestParam(value = "page", defaultValue = "1") @Min(1) Integer page,

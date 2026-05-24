@@ -1,5 +1,5 @@
 server:
-  port: 9500
+  port: 19906 # 本地启动占用 19906 端口
   tomcat:
     connection-timeout: 60000
     accept-count: 100

@@ -55,5 +55,4 @@ public class InternalResourceItemController implements RemoteResourceService {
         groupResService.softRemoveGroupResConfigByGroupId(groupId.toString());
         return R.ok();
     }
-
 }

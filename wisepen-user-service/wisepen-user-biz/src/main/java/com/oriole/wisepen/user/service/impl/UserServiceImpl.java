@@ -10,7 +10,7 @@ import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.toolkit.CollectionUtils;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.oriole.wisepen.common.core.domain.PageResult;
+import com.oriole.wisepen.common.core.domain.PageR;
 import com.oriole.wisepen.common.core.domain.enums.IdentityType;
 import com.oriole.wisepen.common.core.exception.ServiceException;
 import com.oriole.wisepen.system.api.domain.dto.MailSendDTO;
@@ -26,7 +26,7 @@ import com.oriole.wisepen.user.cache.RedisCacheManager;
 import com.oriole.wisepen.user.domain.entity.UserEntity;
 import com.oriole.wisepen.user.domain.entity.UserProfileEntity;
 import com.oriole.wisepen.user.domain.entity.UserWalletEntity;
-import com.oriole.wisepen.user.exception.UserErrorCode;
+import com.oriole.wisepen.user.exception.UserError;
 import com.oriole.wisepen.user.mapper.UserWalletsMapper;
 import com.oriole.wisepen.user.service.IUserService;
 import com.oriole.wisepen.user.mapper.UserMapper;
@@ -90,7 +90,7 @@ public class UserServiceImpl implements IUserService {
     public void register(AuthRegisterRequest req) {
         // 校验用户名是否存在
         if (userMapper.selectCount(Wrappers.<UserEntity>lambdaQuery().eq(UserEntity::getUsername, req.getUsername())) > 0) {
-            throw new ServiceException(UserErrorCode.USERNAME_EXISTED);
+            throw new ServiceException(UserError.USERNAME_ALREADY_EXISTS);
         }
 
         // 新建未验证的学生用户
@@ -129,7 +129,7 @@ public class UserServiceImpl implements IUserService {
             return; // 处于安全考虑，不存在也不报错，防止撞库
         } else if(userEntity.getStatus() == Status.UNIDENTIFIED){
             // 未通过身份认证，不能找回密码
-            throw new ServiceException(UserErrorCode.USER_UNIDENTIFIED);
+            throw new ServiceException(UserError.CANNOT_OPERATE_BEFORE_AUTH_VERIFICATION);
         }
         // uid存入Redis
         String token = redisCacheManager.setPwdResetToken(userEntity.getUserId());
@@ -156,7 +156,7 @@ public class UserServiceImpl implements IUserService {
             log.info("Email sent. username={}, email={}", username, userEntity.getEmail());
         } catch (Exception e) {
             log.error("Email sending failed.", e);
-            throw new ServiceException(UserErrorCode.EMAIL_SEND_ERROR);
+            throw new ServiceException(UserError.USER_PASSWORD_RESET_EMAIL_SEND_FAILED);
         }
     }
 
@@ -191,7 +191,7 @@ public class UserServiceImpl implements IUserService {
     public void resetPassword(AuthPwdResetRequest req){
         Long userId = redisCacheManager.getPwdResetUser(req.getToken());
         if(userId == null){
-            throw new ServiceException(UserErrorCode.PASSWORD_RESET_FAILED);
+            throw new ServiceException(UserError.USER_PASSWORD_RESET_EXPIRED);
         }
 
         updatePasswordByUserId(userId, req.getNewPassword());
@@ -213,7 +213,7 @@ public class UserServiceImpl implements IUserService {
         UserEntity userEntity = userMapper.selectById(userId);
         if(userEntity.getStatus() == Status.UNIDENTIFIED){
             // 未通过身份认证，不能更新Profile
-            throw new ServiceException(UserErrorCode.USER_UNIDENTIFIED);
+            throw new ServiceException(UserError.CANNOT_OPERATE_BEFORE_AUTH_VERIFICATION);
         }
 
         UserVerificationStrategy strategy = strategyFactory.getStrategy(userEntity.getVerificationMode());
@@ -258,7 +258,7 @@ public class UserServiceImpl implements IUserService {
             if (userMapper.selectCount(Wrappers.<UserEntity>lambdaQuery()
                     .eq(UserEntity::getUsername, req.getUsername())
                     .ne(UserEntity::getUserId, userId)) > 0) {
-                throw new ServiceException(UserErrorCode.USERNAME_EXISTED);
+                throw new ServiceException(UserError.USERNAME_ALREADY_EXISTS);
             }
         }
         // 唯一性校验 campusNo
@@ -267,7 +267,7 @@ public class UserServiceImpl implements IUserService {
                     .eq(UserEntity::getCampusNo, req.getCampusNo())
                     .eq(UserEntity::getStatus, Status.NORMAL)
                     .ne(UserEntity::getUserId, userId)) > 0) {
-                throw new ServiceException(UserErrorCode.CAMPUS_NO_EXISTED);
+                throw new ServiceException(UserError.CAMPUS_NO_ALREADY_EXISTS);
             }
         }
 
@@ -292,7 +292,7 @@ public class UserServiceImpl implements IUserService {
     }
 
     @Override
-    public PageResult<UserEntity> getUserListAdmin(int page, int size, String keyword, Status status, IdentityType identityType) {
+    public PageR<UserEntity> getUserListAdmin(int page, int size, String keyword, Status status, IdentityType identityType) {
         page = Math.max(1, page);
         size = Math.max(1, size);
 
@@ -321,9 +321,9 @@ public class UserServiceImpl implements IUserService {
         for (UserEntity userEntity : records) {
             userEntity.setPassword(null);
         }
-        PageResult<UserEntity> pageResult = new PageResult<>(result.getTotal(), page, size);
-        pageResult.addAll(records);
-        return pageResult;
+        PageR<UserEntity> pageR = new PageR<>(result.getTotal(), page, size);
+        pageR.addAll(records);
+        return pageR;
     }
 
     public UserProfileEntity getUserDetailInfoAdmin(Long userId) {

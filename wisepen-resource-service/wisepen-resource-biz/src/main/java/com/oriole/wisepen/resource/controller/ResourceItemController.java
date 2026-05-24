@@ -2,7 +2,7 @@ package com.oriole.wisepen.resource.controller;
 
 import com.alibaba.nacos.common.utils.StringUtils;
 import com.oriole.wisepen.common.core.context.SecurityContextHolder;
-import com.oriole.wisepen.common.core.domain.PageResult;
+import com.oriole.wisepen.common.core.domain.PageR;
 import com.oriole.wisepen.common.core.domain.R;
 import com.oriole.wisepen.common.core.domain.enums.BusinessType;
 import com.oriole.wisepen.common.core.domain.enums.GroupRoleType;
@@ -101,7 +101,7 @@ public class ResourceItemController {
             "3. **个人指定标签** (`不传 groupId` 且 `传 tagIds`)：查询当前用户拥有，且带有指定标签的资源。<br>" +
             "4. **小组指定标签** (`传 groupId` 且 `传 tagIds`)：查询挂载在该小组下、具有指定标签，且当前用户有权限看到的资源。")
     @GetMapping("/listResources")
-    public R<PageResult<ResourceItemResponse>> listResources(
+    public R<PageR<ResourceItemResponse>> listResources(
             @Parameter(description = "小组ID。查个人资源时必须留空")
             @RequestParam(value = "groupId", required = false) String groupId,
             @Parameter(description = "标签ID列表，为空时列出全部资源。配合 groupId 决定查个人的标签还是小组的标签。")
@@ -123,7 +123,7 @@ public class ResourceItemController {
             userGroupRole = SecurityContextHolder.assertInGroup(Long.valueOf(groupId));
         }
 
-        PageResult<ResourceItemResponse> result = resourceService.listResources(
+        PageR<ResourceItemResponse> result = resourceService.listResources(
                 userId,
                 groupId,
                 userGroupRole,

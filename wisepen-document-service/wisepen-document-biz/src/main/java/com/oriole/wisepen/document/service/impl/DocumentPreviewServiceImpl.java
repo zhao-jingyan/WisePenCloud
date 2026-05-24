@@ -5,7 +5,7 @@ import com.oriole.wisepen.document.api.enums.DocumentStatusEnum;
 import com.oriole.wisepen.document.config.DocumentProperties;
 import com.oriole.wisepen.document.domain.entity.DocumentInfoEntity;
 import com.oriole.wisepen.document.domain.entity.DocumentPdfMetaEntity;
-import com.oriole.wisepen.document.exception.DocumentErrorCode;
+import com.oriole.wisepen.document.exception.DocumentError;
 import com.oriole.wisepen.document.repository.DocumentContentRepository;
 import com.oriole.wisepen.document.repository.DocumentInfoRepository;
 import com.oriole.wisepen.document.repository.DocumentPdfMetaRepository;
@@ -79,14 +79,14 @@ public class DocumentPreviewServiceImpl implements IDocumentPreviewService {
                                      String resourceId,
                                      String userId) {
         DocumentInfoEntity doc = documentInfoRepository.findByResourceId(resourceId)
-                .orElseThrow(() -> new ServiceException(DocumentErrorCode.DOCUMENT_NOT_FOUND));
+                .orElseThrow(() -> new ServiceException(DocumentError.DOCUMENT_NOT_FOUND));
 
         if (doc.getDocumentStatus().getStatus() != DocumentStatusEnum.READY){
-            throw new ServiceException(DocumentErrorCode.DOCUMENT_NOT_READY);
+            throw new ServiceException(DocumentError.DOCUMENT_PREVIEW_NOT_READY);
         }
 
         DocumentPdfMetaEntity meta = documentPdfMetaRepository.findById(doc.getDocumentId())
-                .orElseThrow(() -> new ServiceException(DocumentErrorCode.DOCUMENT_PREVIEW_ERROR));
+                .orElseThrow(() -> new ServiceException(DocumentError.DOCUMENT_PREVIEW_FAILED));
 
         long originalSize = meta.getOriginalSize();
         long totalSize = originalSize + meta.getAppendixSize();
@@ -120,17 +120,17 @@ public class DocumentPreviewServiceImpl implements IDocumentPreviewService {
                 response.setStatus(HttpStatus.OK.value());
                 ServletOutputStream out = response.getOutputStream();
                 pipeOssRange(ossUrl, 0, originalSize - 1, out);
-                out.write(buildAppendix(meta, userId, previewTime));
+                out.write(WatermarkAppendixBuilder.build(meta, userId, previewTime, documentProperties.getWatermarkSecretKey()));
             } else {
                 handleRangeRequest(rangeHeader, totalSize, originalSize,
                         ossUrl, meta, userId, previewTime, response);
             }
         } catch (IOException e) {
             log.error("文档预览响应写入失败 ResourceId={}", resourceId, e);
-            throw new ServiceException(DocumentErrorCode.DOCUMENT_PREVIEW_ERROR);
+            throw new ServiceException(DocumentError.DOCUMENT_PREVIEW_FAILED);
         } catch (Exception e) {
             log.error("文档预览请求处理失败 ResourceId={}", resourceId, e);
-            throw new ServiceException(DocumentErrorCode.DOCUMENT_PREVIEW_ERROR);
+            throw new ServiceException(DocumentError.DOCUMENT_PREVIEW_FAILED);
         }
     }
 
@@ -169,7 +169,7 @@ public class DocumentPreviewServiceImpl implements IDocumentPreviewService {
 
         } else if (start >= originalSize) {
             // 情形 2：完全落在附录段 → 内存生成后切片
-            byte[] appendix = buildAppendix(meta, userId, previewTime);
+            byte[] appendix = WatermarkAppendixBuilder.build(meta, userId, previewTime, documentProperties.getWatermarkSecretKey());
             int offset = (int) (start - originalSize);
             int length = (int) (end - start + 1);
             out.write(appendix, offset, length);
@@ -177,7 +177,7 @@ public class DocumentPreviewServiceImpl implements IDocumentPreviewService {
         } else {
             // 情形 3：跨越两段边界 → OSS 尾部 + 附录头部
             pipeOssRange(ossUrl, start, originalSize - 1, out);
-            byte[] appendix = buildAppendix(meta, userId, previewTime);
+            byte[] appendix = WatermarkAppendixBuilder.build(meta, userId, previewTime, documentProperties.getWatermarkSecretKey());
             int lengthInAppendix = (int) (end - originalSize + 1);
             out.write(appendix, 0, lengthInAppendix);
         }
@@ -207,18 +207,6 @@ public class DocumentPreviewServiceImpl implements IDocumentPreviewService {
             while ((n = in.read(buf)) != -1) {
                 out.write(buf, 0, n);
             }
-        }
-    }
-
-    //  附录生成
-    private byte[] buildAppendix(DocumentPdfMetaEntity meta,
-                                  String userId,
-                                  LocalDateTime time) {
-        try {
-            return WatermarkAppendixBuilder.build(meta, userId, time,
-                    documentProperties.getWatermarkSecretKey());
-        } catch (Exception e) {
-            throw new ServiceException(DocumentErrorCode.DOCUMENT_READ_ERROR);
         }
     }
 }

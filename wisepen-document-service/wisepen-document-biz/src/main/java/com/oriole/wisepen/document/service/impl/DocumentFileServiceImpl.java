@@ -1,7 +1,7 @@
 package com.oriole.wisepen.document.service.impl;
 
 import com.oriole.wisepen.common.core.exception.ServiceException;
-import com.oriole.wisepen.document.exception.DocumentErrorCode;
+import com.oriole.wisepen.document.exception.DocumentError;
 import com.oriole.wisepen.document.service.IDocumentFileService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -24,13 +24,13 @@ public class DocumentFileServiceImpl implements IDocumentFileService {
     @Override
     public void convertToPdf(File source, File target) {
         long start = System.currentTimeMillis();
-        log.info("Office→PDF 转换开始 {} ({} bytes)", source.getName(), source.length());
+        log.info("Office → PDF 转换开始 {} ({} bytes)", source.getName(), source.length());
         try {
             documentConverter.convert(source).to(target).execute();
-            log.info("Office→PDF 转换完成 {} ms", System.currentTimeMillis() - start);
+            log.info("Office → PDF 转换完成 {} ms", System.currentTimeMillis() - start);
         } catch (OfficeException e) {
-            log.error("Office→PDF 转换失败 {} ms, file={}", System.currentTimeMillis() - start, source.getName(), e);
-            throw new ServiceException(DocumentErrorCode.DOCUMENT_CONVERT_ERROR);
+            log.error("Office → PDF 转换失败 {} ms, file={}", System.currentTimeMillis() - start, source.getName(), e);
+            throw new ServiceException(DocumentError.DOCUMENT_PROCESS_CONVERT_FAILED);
         }
     }
 
@@ -45,7 +45,7 @@ public class DocumentFileServiceImpl implements IDocumentFileService {
             return text;
         } catch (IOException e) {
             log.error("文本提取失败 {}", pdfFile.getName(), e);
-            throw new ServiceException(DocumentErrorCode.DOCUMENT_READ_ERROR);
+            throw new ServiceException(DocumentError.DOCUMENT_PROCESS_CONTENT_READ_FAILED);
         }
     }
 }

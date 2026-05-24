@@ -1,21 +1,23 @@
 package com.oriole.wisepen.extension.fudan.enums;
 
+import com.baomidou.mybatisplus.annotation.EnumValue;
+import com.fasterxml.jackson.annotation.JsonValue;
+import lombok.AllArgsConstructor;
 import lombok.Getter;
 
 @Getter
+@AllArgsConstructor
 public enum FudanUISTaskState {
-    PENDING(0, "处理中"),
-    WAITING_SCAN(2, "等待用户扫码"),
-    SUCCESS(1, "成功"),
-    FAILED_ERROR(-1, "其他异常"),
-    FAILED_AUTH(-2, "账号密码错误或需进行其他验证"),
-    FAILED_TIMEOUT(-3, "扫码超时");
+    PENDING(0, "PENDING"), // 处理中
+    WAITING_SCAN(2, "WAITING_SCAN"), // 等待用户扫码
+    SUCCESS(1, "SUCCESS"), // 成功
+    FAILED_ERROR(-1, "FAILED_ERROR"),// 其他异常
+    FAILED_AUTH(-2, "FAILED_AUTH"), // 账号密码错误或需进行其他验证
+    FAILED_TIMEOUT(-3, "FAILED_TIMEOUT"); // 扫码超时
 
+    @EnumValue
+    @JsonValue
     private final int code;
-    private final String desc;
 
-    FudanUISTaskState(int code, String desc) {
-        this.code = code;
-        this.desc = desc;
-    }
+    private final String value;
 }

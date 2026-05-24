@@ -1,7 +1,7 @@
 package com.oriole.wisepen.note.service.impl;
 
 import cn.hutool.core.collection.CollUtil;
-import com.oriole.wisepen.common.core.domain.PageResult;
+import com.oriole.wisepen.common.core.domain.PageR;
 import com.oriole.wisepen.common.core.exception.ServiceException;
 import com.oriole.wisepen.note.api.domain.dto.res.NoteSnapshotResponse;
 import com.oriole.wisepen.note.api.domain.dto.res.NoteVersionListResponse;
@@ -9,7 +9,7 @@ import com.oriole.wisepen.note.api.domain.mq.NoteSnapshotMessage;
 import com.oriole.wisepen.note.domain.entity.NoteInfoEntity;
 import com.oriole.wisepen.note.domain.entity.NoteVersionEntity;
 import com.oriole.wisepen.note.api.domain.enums.VersionType;
-import com.oriole.wisepen.note.exception.NoteErrorCode;
+import com.oriole.wisepen.note.exception.NoteError;
 import com.oriole.wisepen.note.repository.NoteDocumentRepository;
 import com.oriole.wisepen.note.repository.NoteVersionRepository;
 import com.oriole.wisepen.note.service.INoteVersionService;
@@ -69,7 +69,7 @@ public class NoteVersionServiceImpl implements INoteVersionService {
     @Override
     public NoteSnapshotResponse getLatestVersion(String resourceId) {
         NoteInfoEntity noteInfoEntity = noteDocumentRepository.findByResourceId(resourceId)
-                .orElseThrow(() -> new ServiceException(NoteErrorCode.NOTE_NOT_FOUND));
+                .orElseThrow(() -> new ServiceException(NoteError.NOTE_NOT_FOUND));
         // 获取最后一个Full版本
         Optional<NoteVersionEntity> latestFullVersionEntity = noteVersionRepository
                 .findFirstByResourceIdAndTypeOrderByVersionDesc(resourceId, VersionType.FULL);
@@ -105,11 +105,11 @@ public class NoteVersionServiceImpl implements INoteVersionService {
     }
 
     @Override
-    public PageResult<NoteVersionListResponse> listVersions(String resourceId, int page, int size) {
+    public PageR<NoteVersionListResponse> listVersions(String resourceId, int page, int size) {
         Pageable pageable = PageRequest.of(Math.max(page - 1, 0), size);
         Page<NoteVersionEntity> entityPage = noteVersionRepository.findByResourceIdOrderByVersionDesc(resourceId, pageable);
 
-        PageResult<NoteVersionListResponse> pageResult = new PageResult<>(entityPage.getTotalElements(), page, size);
+        PageR<NoteVersionListResponse> pageR = new PageR<>(entityPage.getTotalElements(), page, size);
 
         List<NoteVersionListResponse> responses = entityPage.getContent().stream().map(entity -> {
             NoteVersionListResponse response = new NoteVersionListResponse();
@@ -117,7 +117,7 @@ public class NoteVersionServiceImpl implements INoteVersionService {
             return response;
         }).toList();
 
-        pageResult.addAll(responses);
-        return pageResult;
+        pageR.addAll(responses);
+        return pageR;
     }
 }

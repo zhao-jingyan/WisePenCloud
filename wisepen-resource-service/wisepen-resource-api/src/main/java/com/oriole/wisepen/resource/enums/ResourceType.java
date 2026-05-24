@@ -10,42 +10,37 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * 平台资源类型枚举。
- * <p>
+ * 平台资源类型枚举
  * 覆盖所有受平台管理的资源类型，包括有实体文件的文档类型和无扩展名的笔记类型。
- * 通过 {@link #fromExtension(String)} 将文件扩展名字符串（大小写不敏感）转换为枚举值；
- * 返回 {@code null} 代表该扩展名未在平台注册，调用方视为不支持。
- * </p>
- * <p>
- * 注意：哪些类型允许上传、哪些类型需要格式转换，属于各业务微服务自身的策略，
- * 不在此枚举中声明。
- * </p>
  */
 @Getter
 @AllArgsConstructor
 public enum ResourceType {
 
-    /** 无扩展名的笔记，由笔记服务管理，不经过文件上传流程 */
-    NOTE("note"),
-    PDF("pdf"),
-    DOC("doc"),
-    DOCX("docx"),
-    PPT("ppt"),
-    PPTX("pptx"),
-    XLS("xls"),
-    XLSX("xlsx"),
-    UNKNOWN("unknown");
+    /** 无扩展名的笔记，由笔记服务管理，不经过文件上传流程。 */
+    NOTE(1, "NOTE", "note"),
+    PDF(2, "PDF", "pdf"),
+    DOC(3, "DOC", "doc"),
+    DOCX(4, "DOCX", "docx"),
+    PPT(5, "PPT", "ppt"),
+    PPTX(6, "PPTX", "pptx"),
+    XLS(7, "XLS", "xls"),
+    XLSX(8, "XLSX", "xlsx"),
+    UNKNOWN(9, "UNKNOWN", "unknown");
 
-    /** 枚举标识值（文件类扩展名小写，NOTE 使用逻辑标识），同时作为 DB 存储值和 JSON 序列化值 */
     @EnumValue
     @JsonValue
+    private final int code;
+
+    private final String value;
+
     private final String extension;
 
     private static final Map<String, ResourceType> EXT_MAP = new HashMap<>();
 
     static {
-        for (ResourceType e : values()) {
-            EXT_MAP.put(e.extension, e);
+        for (ResourceType item : values()) {
+            EXT_MAP.put(item.extension, item);
         }
     }
 
@@ -53,13 +48,13 @@ public enum ResourceType {
      * 根据扩展名（大小写不敏感）查找对应枚举值。
      *
      * @param ext 扩展名或类型标识字符串，如 "docx"、"PDF"、"note"
-     * @return 对应枚举值，不支持时返回 {@code null}
+     * @return 对应枚举值
      */
     @JsonCreator
     public static ResourceType fromExtension(String ext) {
         if (ext == null) {
             return null;
         }
-        return EXT_MAP.get(ext.toLowerCase());
+        return EXT_MAP.get(ext.trim().toLowerCase());
     }
 }

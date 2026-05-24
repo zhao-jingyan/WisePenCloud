@@ -1,7 +1,7 @@
 package com.oriole.wisepen.note.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
-import com.oriole.wisepen.common.core.domain.PageResult;
+import com.oriole.wisepen.common.core.domain.PageR;
 import com.oriole.wisepen.note.api.domain.dto.res.NoteOperationLogResponse;
 import com.oriole.wisepen.note.api.domain.mq.NoteOperationLogMessage;
 import com.oriole.wisepen.note.domain.entity.NoteOperationLogEntity;
@@ -35,10 +35,10 @@ public class NoteOperationLogServiceImpl implements INoteOperationLogService {
     }
 
     @Override
-    public PageResult<NoteOperationLogResponse> listOperationLogs(String resourceId, int page, int size) {
+    public PageR<NoteOperationLogResponse> listOperationLogs(String resourceId, int page, int size) {
         Pageable pageable = PageRequest.of(Math.max(page - 1, 0), size);
         Page<NoteOperationLogEntity> entityPage = noteOperationLogRepository.findByResourceIdOrderByTimestampDesc(resourceId, pageable);
-        PageResult<NoteOperationLogResponse> pageResult = new PageResult<>(entityPage.getTotalElements(), page, size);
+        PageR<NoteOperationLogResponse> pageR = new PageR<>(entityPage.getTotalElements(), page, size);
 
         List<NoteOperationLogResponse> responses = entityPage.getContent().stream().map(entity -> {
             NoteOperationLogResponse response = new NoteOperationLogResponse();
@@ -46,8 +46,8 @@ public class NoteOperationLogServiceImpl implements INoteOperationLogService {
             return response;
         }).toList();
 
-        pageResult.addAll(responses);
-        return pageResult;
+        pageR.addAll(responses);
+        return pageR;
     }
 
     @Override

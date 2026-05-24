@@ -19,7 +19,7 @@ public enum GroupType {
 	@JsonValue
 	private final int code;
 
-	private final String desc;
+	private final String value;
 
 	public static GroupType getByCode(Integer code) {
 		if (code == null) {return null;}

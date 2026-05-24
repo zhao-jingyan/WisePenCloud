@@ -1,6 +1,6 @@
 package com.oriole.wisepen.user.service;
 
-import com.oriole.wisepen.common.core.domain.PageResult;
+import com.oriole.wisepen.common.core.domain.PageR;
 import com.oriole.wisepen.common.core.domain.enums.GroupRoleType;
 import com.oriole.wisepen.user.api.domain.dto.req.*;
 import com.oriole.wisepen.user.api.domain.dto.res.GroupMemberDetailResponse;
@@ -25,7 +25,7 @@ public interface IGroupMemberService {
 	GroupMemberDetailResponse getGroupMemberInfoByUserId(Long groupId, Long userId);
 
 	// 获取群组成员分页列表
-	PageResult<GroupMemberDetailResponse> getGroupMemberList(Long groupId, int page, int size);
+	PageR<GroupMemberDetailResponse> getGroupMemberList(Long groupId, int page, int size);
 
 	// 内部业务方法
 

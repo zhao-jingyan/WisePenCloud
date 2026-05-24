@@ -17,5 +17,5 @@ public enum GenderType {
     @JsonValue
     private final int code;
 
-    private final String desc;
+    private final String value;
 }

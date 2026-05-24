@@ -1,6 +1,6 @@
 package com.oriole.wisepen.user.service;
 
-import com.oriole.wisepen.common.core.domain.PageResult;
+import com.oriole.wisepen.common.core.domain.PageR;
 import com.oriole.wisepen.user.api.domain.base.GroupDisplayBase;
 import com.oriole.wisepen.user.api.domain.dto.req.GroupCreateRequest;
 import com.oriole.wisepen.user.api.domain.dto.req.GroupDeleteRequest;
@@ -34,5 +34,5 @@ public interface IGroupService {
     void deleteGroup(Long userId, GroupDeleteRequest req);
 
     // 获取指定用户的群组分页列表
-    PageResult<GroupItemInfoResponse> getGroupList(Long userId, GroupRoleFilter groupRoleFilter, int page, int size);
+    PageR<GroupItemInfoResponse> getGroupList(Long userId, GroupRoleFilter groupRoleFilter, int page, int size);
 }

@@ -1,5 +1,5 @@
 server:
-  port: 9400 # 本地启动占用 9400 端口
+  port: 19905 # 本地启动占用 19905 端口
 
 spring:
   application:
@@ -29,3 +29,10 @@ spring:
         - 10 #指定首选的网络号段 (校园网段10开头)
   profiles:
     active: dev # 激活开发环境配置
+
+# 资源服务业务配置
+wisepen:
+  resource:
+    # 阅读量去重窗口时长（分钟）。
+    # 同一用户在此时间内重复打开同一资源，仅计一次阅读。
+    read-dedup-ttl-minutes: 10

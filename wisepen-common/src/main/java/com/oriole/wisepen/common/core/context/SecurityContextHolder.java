@@ -10,11 +10,11 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
+import com.oriole.wisepen.common.core.constant.CommonError;
 import com.oriole.wisepen.common.core.constant.SecurityConstants;
 import com.oriole.wisepen.common.core.domain.enums.GroupRoleType;
 import com.oriole.wisepen.common.core.domain.enums.IdentityType;
-import com.oriole.wisepen.common.security.exception.PermissionErrorCode;
-import com.oriole.wisepen.common.core.domain.enums.ResultCode;
+import com.oriole.wisepen.common.security.exception.PermissionError;
 import com.oriole.wisepen.common.security.exception.PermissionException;
 import com.oriole.wisepen.common.core.exception.ServiceException;
 
@@ -93,29 +93,35 @@ public class SecurityContextHolder {
 
     public static void assertUserId(Long userId) {
         if (!userId.equals(getUserId())){
-            throw new PermissionException(PermissionErrorCode.OPERATION_UNAUTHORIZED);
+            throw new PermissionException(PermissionError.PERMISSION_DENIED);
         }
     }
 
     public static GroupRoleType assertInGroup(Long targetGroupId) {
+        if (targetGroupId == null) {
+            throw new ServiceException(CommonError.SECURITY_CONTEXT_PARAM_MISSING);
+        }
         GroupRoleType currentRole = getGroupRole(targetGroupId);
         if (currentRole == GroupRoleType.NOT_MEMBER){
-            throw new PermissionException(PermissionErrorCode.OPERATION_UNAUTHORIZED);
+            throw new PermissionException(PermissionError.PERMISSION_DENIED);
         }
         return currentRole;
     }
 
     public static void assertGroupRole(Long targetGroupId, List<GroupRoleType> requiredRoles) {
         if (targetGroupId == null || CollUtil.isEmpty(requiredRoles)) {
-            throw new ServiceException(ResultCode.SYSTEM_ERROR);
+            throw new ServiceException(CommonError.SECURITY_CONTEXT_PARAM_MISSING);
         }
         GroupRoleType currentRole = getGroupRole(targetGroupId);
         if (!requiredRoles.contains(currentRole)) {
-            throw new PermissionException(PermissionErrorCode.OPERATION_UNAUTHORIZED);
+            throw new PermissionException(PermissionError.PERMISSION_DENIED);
         }
     }
 
     public static void assertGroupRole(Long targetGroupId, GroupRoleType... requiredRoles) {
+        if (targetGroupId == null) {
+            throw new ServiceException(CommonError.SECURITY_CONTEXT_PARAM_MISSING);
+        }
         assertGroupRole(targetGroupId, Arrays.asList(requiredRoles));
     }
 

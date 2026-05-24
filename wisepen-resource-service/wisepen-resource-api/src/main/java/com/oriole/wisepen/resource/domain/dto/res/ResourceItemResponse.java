@@ -1,5 +1,6 @@
 package com.oriole.wisepen.resource.domain.dto.res;
 
+import com.oriole.wisepen.resource.domain.base.ResourceInteractionInfoBase;
 import com.oriole.wisepen.resource.domain.base.ResourceItemInfoBase;
 import com.oriole.wisepen.resource.enums.ResourceAction;
 import com.oriole.wisepen.user.api.domain.base.UserDisplayBase;
@@ -14,6 +15,8 @@ import java.util.Map;
 public class ResourceItemResponse extends ResourceItemInfoBase {
     private String resourceId;
     private UserDisplayBase ownerInfo;
+
+    private ResourceInteractionInfoBase resourceInteractionInfo;
 
     private Map<String, String> currentTags;
     private List<ResourceAction> currentActions;

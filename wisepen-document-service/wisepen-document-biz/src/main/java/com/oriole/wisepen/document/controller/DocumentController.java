@@ -23,13 +23,15 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
-import static com.oriole.wisepen.document.exception.DocumentErrorCode.DOCUMENT_PERMISSION_DENIED;
+import static com.oriole.wisepen.document.exception.DocumentError.DOCUMENT_PERMISSION_DENIED;
 
 
+@Slf4j
 @RestController
 @RequestMapping("/document")
 @RequiredArgsConstructor

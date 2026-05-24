@@ -5,7 +5,7 @@ import com.oriole.wisepen.common.core.exception.ServiceException;
 import com.oriole.wisepen.note.api.domain.base.NoteInfoBase;
 import com.oriole.wisepen.note.api.domain.dto.req.NoteCreateRequest;
 import com.oriole.wisepen.note.domain.entity.NoteInfoEntity;
-import com.oriole.wisepen.note.exception.NoteErrorCode;
+import com.oriole.wisepen.note.exception.NoteError;
 import com.oriole.wisepen.note.repository.NoteDocumentRepository;
 import com.oriole.wisepen.note.service.INoteOperationLogService;
 import com.oriole.wisepen.note.service.INoteService;
@@ -68,7 +68,7 @@ public class NoteServiceImpl implements INoteService {
     @Override
     public NoteInfoBase getNoteInfo(String resourceId) {
         NoteInfoEntity noteInfoEntity = noteDocumentRepository.findByResourceId(resourceId)
-                .orElseThrow(() -> new ServiceException(NoteErrorCode.NOTE_NOT_FOUND));
+                .orElseThrow(() -> new ServiceException(NoteError.NOTE_NOT_FOUND));
         return BeanUtil.copyProperties(noteInfoEntity, NoteInfoBase.class);
     }
 }

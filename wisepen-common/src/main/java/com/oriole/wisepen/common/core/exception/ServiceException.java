@@ -1,5 +1,6 @@
 package com.oriole.wisepen.common.core.exception;
 
+import com.oriole.wisepen.common.core.domain.IResult;
 import lombok.Getter;
 
 /**
@@ -8,20 +9,15 @@ import lombok.Getter;
 @Getter
 public class ServiceException extends RuntimeException {
 
-    private final Integer code;
+    private final IResult errorResult;
 
-    public ServiceException(IErrorCode errorCode) {
-        super(errorCode.getMsg());
-        this.code = errorCode.getCode();
+    public ServiceException(IResult errorResult) {
+        super(errorResult.getMsg());
+        this.errorResult = errorResult;
     }
 
-    public ServiceException(IErrorCode errorCode, String msg) {
-        super(errorCode.getMsg() + ": " + msg);
-        this.code = errorCode.getCode();
-    }
-
-    public ServiceException(String msg) {
-        super(msg);
-        this.code = 500;
+    public ServiceException(IResult errorResult, String msg) {
+        super(errorResult.getMsg() + ": " + msg);
+        this.errorResult = errorResult;
     }
 }

@@ -1,6 +1,6 @@
 package com.oriole.wisepen.note.controller;
 
-import com.oriole.wisepen.common.core.domain.PageResult;
+import com.oriole.wisepen.common.core.domain.PageR;
 import com.oriole.wisepen.common.core.domain.R;
 import com.oriole.wisepen.common.security.annotation.CheckLogin;
 import com.oriole.wisepen.note.api.domain.dto.res.NoteOperationLogResponse;
@@ -21,7 +21,7 @@ public class OpLogController {
 
     @Operation(summary = "查询操作日志")
     @GetMapping("/getNoteOpLogs")
-    public R<PageResult<NoteOperationLogResponse>> listNoteOperationLogs(
+    public R<PageR<NoteOperationLogResponse>> listNoteOperationLogs(
             @RequestParam String resourceId,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size) {

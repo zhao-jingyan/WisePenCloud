@@ -1,13 +1,13 @@
 package com.oriole.wisepen.user.controller;
 
 import com.oriole.wisepen.common.core.context.SecurityContextHolder;
-import com.oriole.wisepen.common.core.domain.PageResult;
+import com.oriole.wisepen.common.core.domain.PageR;
 import com.oriole.wisepen.common.core.domain.R;
 import com.oriole.wisepen.common.core.domain.enums.GroupRoleType;
 import com.oriole.wisepen.common.core.domain.enums.GroupType;
 import com.oriole.wisepen.common.core.domain.enums.IdentityType;
 import com.oriole.wisepen.common.security.annotation.CheckLogin;
-import com.oriole.wisepen.common.security.exception.PermissionErrorCode;
+import com.oriole.wisepen.common.security.exception.PermissionError;
 import com.oriole.wisepen.common.security.exception.PermissionException;
 import com.oriole.wisepen.user.api.domain.dto.req.GroupCreateRequest;
 import com.oriole.wisepen.user.api.domain.dto.req.GroupDeleteRequest;
@@ -17,8 +17,6 @@ import com.oriole.wisepen.user.api.domain.dto.res.GroupDetailInfoResponse;
 import com.oriole.wisepen.user.api.domain.dto.res.GroupItemInfoResponse;
 import com.oriole.wisepen.user.api.enums.GroupRoleFilter;
 import com.oriole.wisepen.user.service.IGroupService;
-import jakarta.validation.constraints.Max;
-import jakarta.validation.constraints.Min;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.validation.annotation.Validated;
@@ -45,11 +43,11 @@ public class GroupController {
 
 		IdentityType userIdentityType= SecurityContextHolder.getIdentityType();
 		if (req.getGroupType() == GroupType.ADVANCED_GROUP && userIdentityType == IdentityType.STUDENT) {
-			throw new PermissionException(PermissionErrorCode.IDENTITY_UNAUTHORIZED);
+			throw new PermissionException(PermissionError.UNAUTHORIZED);
 		}
 
 		if (req.getGroupType()==GroupType.MARKET_GROUP && userIdentityType != IdentityType.ADMIN) {
-			throw new PermissionException(PermissionErrorCode.IDENTITY_UNAUTHORIZED);
+			throw new PermissionException(PermissionError.UNAUTHORIZED);
 		}
 
 		return R.ok(groupService.createGroup(req, SecurityContextHolder.getUserId()));
@@ -61,11 +59,11 @@ public class GroupController {
 
 		IdentityType userIdentityType= SecurityContextHolder.getIdentityType();
 		if (req.getGroupType() == GroupType.ADVANCED_GROUP && userIdentityType == IdentityType.STUDENT) {
-			throw new PermissionException(PermissionErrorCode.IDENTITY_UNAUTHORIZED);
+			throw new PermissionException(PermissionError.UNAUTHORIZED);
 		}
 
 		if (req.getGroupType()==GroupType.MARKET_GROUP && userIdentityType != IdentityType.ADMIN) {
-			throw new PermissionException(PermissionErrorCode.IDENTITY_UNAUTHORIZED);
+			throw new PermissionException(PermissionError.UNAUTHORIZED);
 		}
 		groupService.updateGroup(req);
 		return R.ok();
@@ -80,7 +78,7 @@ public class GroupController {
 	}
 
 	@GetMapping("/list")
-	public R<PageResult<GroupItemInfoResponse>> listGroups(
+	public R<PageR<GroupItemInfoResponse>> listGroups(
 			@RequestParam GroupRoleFilter groupRoleFilter,
 			@RequestParam(value = "page", defaultValue = "1") int page,
 			@RequestParam(value = "size", defaultValue = "20") int size

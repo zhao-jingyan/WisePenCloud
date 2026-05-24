@@ -5,7 +5,7 @@ import cn.hutool.core.util.IdUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.CollectionUtils;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.oriole.wisepen.common.core.domain.PageResult;
+import com.oriole.wisepen.common.core.domain.PageR;
 import com.oriole.wisepen.common.core.domain.enums.GroupRoleType;
 import com.oriole.wisepen.common.core.domain.enums.GroupType;
 import com.oriole.wisepen.common.core.exception.ServiceException;
@@ -22,7 +22,7 @@ import com.oriole.wisepen.user.api.enums.TokenTransferType;
 import com.oriole.wisepen.user.cache.RedisCacheManager;
 import com.oriole.wisepen.user.domain.entity.GroupEntity;
 import com.oriole.wisepen.user.domain.entity.GroupMemberEntity;
-import com.oriole.wisepen.user.exception.GroupErrorCode;
+import com.oriole.wisepen.user.exception.UserError;
 import com.oriole.wisepen.user.mapper.GroupMapper;
 import com.oriole.wisepen.user.mapper.GroupMemberMapper;
 import com.oriole.wisepen.resource.feign.RemoteResourceService;
@@ -57,11 +57,11 @@ public class GroupServiceImpl implements IGroupService {
                 .eq(GroupEntity::getInviteCode, req.getInviteCode());
         GroupEntity group = groupMapper.selectOne(queryWrapper);
         if (group == null) {
-            throw new ServiceException(GroupErrorCode.GROUP_NOT_EXIST);
+            throw new ServiceException(UserError.GROUP_NOT_EXIST);
         }
 
         if (userJoinedGroupIds.contains(group.getGroupId())) {
-            throw new ServiceException(GroupErrorCode.MEMBER_IS_EXISTED);
+            throw new ServiceException(UserError.GROUP_MEMBER_ALREADY_EXISTS);
         }
 
         groupMemberService.joinGroup(group.getGroupId(), userId, GroupRoleType.MEMBER);
@@ -89,7 +89,7 @@ public class GroupServiceImpl implements IGroupService {
         group.setUpdateTime(LocalDateTime.now());
         int rows = groupMapper.updateById(group);
         if (rows == 0) {
-            throw new ServiceException(GroupErrorCode.GROUP_NOT_EXIST);
+            throw new ServiceException(UserError.GROUP_NOT_EXIST);
         }
     }
 
@@ -98,7 +98,7 @@ public class GroupServiceImpl implements IGroupService {
         Long groupId = req.getGroupId();
         GroupEntity group = groupMapper.selectById(groupId);
         if (group == null) {
-            throw new ServiceException(GroupErrorCode.GROUP_NOT_EXIST);
+            throw new ServiceException(UserError.GROUP_NOT_EXIST);
         }
         if (group.getGroupType()==GroupType.ADVANCED_GROUP) {
             walletService.transferTokenBetweenGroupAndUser(userId, groupId, group.getTokenBalance(), TokenTransferType.USER_INFLOW);
@@ -115,7 +115,7 @@ public class GroupServiceImpl implements IGroupService {
     }
 
     @Override
-    public PageResult<GroupItemInfoResponse> getGroupList(Long userId, GroupRoleFilter groupRoleFilter, int page, int size) {
+    public PageR<GroupItemInfoResponse> getGroupList(Long userId, GroupRoleFilter groupRoleFilter, int page, int size) {
         Page<GroupMemberEntity> memberPage = new Page<>(page, size);
 
         LambdaQueryWrapper<GroupMemberEntity> wrapper = new LambdaQueryWrapper<>();
@@ -131,9 +131,9 @@ public class GroupServiceImpl implements IGroupService {
                 .map(GroupMemberEntity::getGroupId)
                 .collect(Collectors.toList());
 
-        PageResult<GroupItemInfoResponse> pageResult = new PageResult<>(resultPage.getTotal(), page, size);
+        PageR<GroupItemInfoResponse> pageR = new PageR<>(resultPage.getTotal(), page, size);
         if (groupIds.isEmpty()) {
-            return pageResult;
+            return pageR;
         }
 
         List<GroupEntity> groups = groupMapper.selectBatchIds(groupIds);
@@ -146,14 +146,14 @@ public class GroupServiceImpl implements IGroupService {
             return resp;
         }).collect(Collectors.toList());
 
-        pageResult.addAll(responses);
-        return pageResult;
+        pageR.addAll(responses);
+        return pageR;
     }
 
     public GroupEntity getGroupInfoById(Long groupId) {
         GroupEntity group = groupMapper.selectById(groupId);
         if (group == null) {
-            throw new ServiceException(GroupErrorCode.GROUP_NOT_EXIST);
+            throw new ServiceException(UserError.GROUP_NOT_EXIST);
         }
         return group;
     }

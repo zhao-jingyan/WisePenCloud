@@ -5,8 +5,6 @@ import com.fasterxml.jackson.annotation.JsonValue;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 
-import java.util.Arrays;
-
 @Getter
 @AllArgsConstructor
 public enum ModelType {
@@ -17,5 +15,5 @@ public enum ModelType {
 	@EnumValue
 	@JsonValue
 	private final int code;
-	private final String desc;
+	private final String value;
 }

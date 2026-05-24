@@ -1,9 +1,8 @@
 package com.oriole.wisepen.user.controller;
 
 import com.oriole.wisepen.common.core.context.SecurityContextHolder;
-import com.oriole.wisepen.common.core.domain.PageResult;
+import com.oriole.wisepen.common.core.domain.PageR;
 import com.oriole.wisepen.common.core.domain.R;
-import com.oriole.wisepen.user.api.enums.TokenPayerType;
 import com.oriole.wisepen.common.core.domain.enums.GroupRoleType;
 import com.oriole.wisepen.common.security.annotation.CheckLogin;
 import com.oriole.wisepen.user.api.domain.dto.req.GroupMemberKickRequest;
@@ -12,7 +11,6 @@ import com.oriole.wisepen.user.api.domain.dto.req.GroupMemberQuitRequest;
 import com.oriole.wisepen.user.api.domain.dto.req.GroupMemberTokenLimitUpdateRequest;
 import com.oriole.wisepen.user.api.domain.dto.res.GroupMemberDetailResponse;
 import com.oriole.wisepen.user.api.domain.dto.res.GroupMemberTokenDetailResponse;
-import com.oriole.wisepen.user.api.domain.dto.res.WalletDetailResponse;
 import com.oriole.wisepen.user.service.IGroupMemberService;
 import com.oriole.wisepen.user.service.IWalletService;
 import jakarta.validation.Valid;
@@ -53,7 +51,7 @@ public class GroupMemberController {
 	}
 
 	@GetMapping("/list")
-	public R<PageResult<GroupMemberDetailResponse>> listGroupMembers(
+	public R<PageR<GroupMemberDetailResponse>> listGroupMembers(
 			@RequestParam("groupId") Long groupId,
 			@RequestParam(value = "page", defaultValue = "1") @Min(1) int page,
 			@RequestParam(value = "size", defaultValue = "20") @Min(1) int size
@@ -80,7 +78,7 @@ public class GroupMemberController {
 	}
 
 	@GetMapping("/getAllMyGroupTokenInfo")
-	public R<PageResult<GroupMemberTokenDetailResponse>> getAllMyGroupTokenInfo(
+	public R<PageR<GroupMemberTokenDetailResponse>> getAllMyGroupTokenInfo(
 			@RequestParam(value = "page", defaultValue = "1") @Min(1) Integer page,
 			@RequestParam(value = "size", defaultValue = "20") @Min(1) Integer size
 	){

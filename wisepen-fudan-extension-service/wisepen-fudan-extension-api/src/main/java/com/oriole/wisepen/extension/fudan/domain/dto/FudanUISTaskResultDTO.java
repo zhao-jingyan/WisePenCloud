@@ -15,7 +15,7 @@ public class FudanUISTaskResultDTO {
     public static FudanUISTaskResultDTO of(FudanUISTaskState state) {
         FudanUISTaskResultDTO dto = new FudanUISTaskResultDTO();
         dto.setState(state.getCode());
-        dto.setMessage(state.getDesc());
+        dto.setMessage(state.getValue());
         return dto;
     }
 }

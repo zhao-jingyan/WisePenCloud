@@ -21,7 +21,7 @@ import com.oriole.wisepen.file.storage.api.enums.StorageSceneEnum;
 import com.oriole.wisepen.file.storage.api.enums.StorageStatusEnum;
 import com.oriole.wisepen.file.storage.config.StorageProperties;
 import com.oriole.wisepen.file.storage.domain.entity.StorageRecordEntity;
-import com.oriole.wisepen.file.storage.exception.StorageErrorCode;
+import com.oriole.wisepen.file.storage.exception.FileStorageError;
 import com.oriole.wisepen.file.storage.mapper.StorageRecordMapper;
 import com.oriole.wisepen.file.storage.mq.KafkaStorageEventPublisher;
 import com.oriole.wisepen.file.storage.service.IStorageService;
@@ -36,7 +36,6 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -118,7 +117,7 @@ public class StorageServiceImpl implements IStorageService {
     @Override
     public StorageRecordDTO uploadSmallFileProxy(MultipartFile file, StorageSceneEnum scene, String bizTag) {
         if (file.getSize() > storageProperties.getMaxSmallFileSize()) {
-            throw new ServiceException(StorageErrorCode.FILE_SIZE_EXCEEDED);
+            throw new ServiceException(FileStorageError.FILE_SIZE_ABOVE_UPPER_BOUND);
         }
 
         String extension = FileUtil.extName(file.getOriginalFilename()).toLowerCase();
@@ -146,12 +145,12 @@ public class StorageServiceImpl implements IStorageService {
                         .last("LIMIT 1")
         );
         if (record == null) {
-            throw new ServiceException(StorageErrorCode.RECORD_NOT_FOUND);
+            throw new ServiceException(FileStorageError.FILE_RECORD_NOT_FOUND);
         }
         if (StorageStatusEnum.UPLOADING.equals(record.getStatus())) {
             StorageRecordDTO storageRecordDTO = this.compensateStatus(record);
             if (storageRecordDTO == null) {
-                throw new ServiceException(StorageErrorCode.RECORD_NOT_FOUND);
+                throw new ServiceException(FileStorageError.FILE_RECORD_NOT_FOUND);
             }
         }
 
@@ -169,7 +168,7 @@ public class StorageServiceImpl implements IStorageService {
         );
 
         if (updateCount == 0) {
-            throw new ServiceException(StorageErrorCode.RECORD_NOT_FOUND);
+            throw new ServiceException(FileStorageError.FILE_RECORD_NOT_FOUND);
         }
         log.info("执行批量软删除成功，影响行数: {}, objectKeys: {}", updateCount, objectKeys);
     }
@@ -206,7 +205,7 @@ public class StorageServiceImpl implements IStorageService {
         StorageProvider provider = storageManager.getProvider(record.getConfigId());
 
         if (!provider.verifyCallbackSignature(request, rawBody)) {
-            throw new ServiceException(StorageErrorCode.CALLBACK_SIGNATURE_INVALID);
+            throw new ServiceException(FileStorageError.STORAGE_PROVIDER_CALLBACK_SIGNATURE_INVALID);
         }
 
         if (StorageStatusEnum.AVAILABLE.equals(record.getStatus())) {

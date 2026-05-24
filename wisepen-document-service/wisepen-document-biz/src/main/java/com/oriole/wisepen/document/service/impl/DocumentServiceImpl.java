@@ -16,7 +16,7 @@ import com.oriole.wisepen.document.api.enums.DocumentStatusEnum;
 import com.oriole.wisepen.document.domain.entity.DocumentContentEntity;
 import com.oriole.wisepen.document.domain.entity.DocumentInfoEntity;
 import com.oriole.wisepen.document.domain.entity.DocumentPdfMetaEntity;
-import com.oriole.wisepen.document.exception.DocumentErrorCode;
+import com.oriole.wisepen.document.exception.DocumentError;
 import com.oriole.wisepen.document.mq.KafkaDocumentEventPublisher;
 import com.oriole.wisepen.document.repository.DocumentContentRepository;
 import com.oriole.wisepen.document.repository.DocumentInfoRepository;
@@ -60,7 +60,7 @@ public class DocumentServiceImpl implements IDocumentService {
     public DocumentUploadInitResponse initUploadDocument(DocumentUploadInitRequest request, Long uploaderId) {
         ResourceType fileType = ResourceType.fromExtension(request.getExtension());
         if (fileType == null || !DocumentConstants.ALLOWED_TYPES.contains(fileType)) {
-            throw new ServiceException(DocumentErrorCode.DOCUMENT_TYPE_NOT_ALLOWED);
+            throw new ServiceException(DocumentError.CANNOT_SUPPORT_FILE_TYPE);
         }
 
         String documentId = IdUtil.fastSimpleUUID();
@@ -77,7 +77,7 @@ public class DocumentServiceImpl implements IDocumentService {
         }
         catch (Exception e) {
             log.warn("存储服务申请上传 URL 失败", e);
-            throw new ServiceException(DocumentErrorCode.DOCUMENT_UPLOAD_ERROR, e.getMessage());
+            throw new ServiceException(DocumentError.DOCUMENT_UPLOAD_URL_APPLY_FAILED, e.getMessage());
         }
 
         DocumentUploadMeta meta = DocumentUploadMeta.builder().fileType(fileType)
@@ -133,20 +133,20 @@ public class DocumentServiceImpl implements IDocumentService {
     @Override
     public void assertDocumentUploader(String documentId, Long uploaderId) {
         DocumentInfoEntity entity = documentInfoRepository.findById(documentId)
-                .orElseThrow(() -> new ServiceException(DocumentErrorCode.DOCUMENT_NOT_FOUND));
+                .orElseThrow(() -> new ServiceException(DocumentError.DOCUMENT_NOT_FOUND));
 
         if (!uploaderId.equals(entity.getUploadMeta().getUploaderId())) {
-            throw new ServiceException(DocumentErrorCode.DOCUMENT_PERMISSION_DENIED);
+            throw new ServiceException(DocumentError.DOCUMENT_PERMISSION_DENIED);
         }
     }
 
     @Override
     public void retryDocProcess(String documentId) {
         DocumentInfoEntity entity = documentInfoRepository.findById(documentId)
-                .orElseThrow(() -> new ServiceException(DocumentErrorCode.DOCUMENT_NOT_FOUND));
+                .orElseThrow(() -> new ServiceException(DocumentError.DOCUMENT_NOT_FOUND));
 
         if (entity.getDocumentStatus().getStatus() != DocumentStatusEnum.FAILED && entity.getDocumentStatus().getStatus() != DocumentStatusEnum.REGISTERING_RES_TIMEOUT) {
-            throw new ServiceException(DocumentErrorCode.DOCUMENT_RETRY_STATE_INVALID);
+            throw new ServiceException(DocumentError.CANNOT_RETRY_DOCUMENT_PROCESS_IN_CURRENT_STATE);
         }
         switch (entity.getDocumentStatus().getStatus()) {
             case FAILED:
@@ -169,13 +169,13 @@ public class DocumentServiceImpl implements IDocumentService {
     @Override
     public void deletedDocument(String documentId) {
         DocumentInfoEntity entity = documentInfoRepository.findById(documentId)
-                .orElseThrow(() -> new ServiceException(DocumentErrorCode.DOCUMENT_NOT_FOUND));
+                .orElseThrow(() -> new ServiceException(DocumentError.DOCUMENT_NOT_FOUND));
         if (entity.getDocumentStatus().getStatus() == DocumentStatusEnum.READY) {
-            throw new ServiceException(DocumentErrorCode.DOCUMENT_ALREADY_READY);
+            throw new ServiceException(DocumentError.CANNOT_CANCEL_READY_DOCUMENT_PROCESS);
         }
 
         if (entity.getDocumentStatus().getStatus() == DocumentStatusEnum.CONVERTING_AND_PARSING) {
-            throw new ServiceException(DocumentErrorCode.DOCUMENT_CONVERTING_AND_PARSING);
+            throw new ServiceException(DocumentError.CANNOT_CANCEL_DOCUMENT_PROCESS_IN_CURRENT_STATE);
         }
 
         // NOTE：在CONVERTING_AND_PARSING或READY时不能终止
@@ -227,7 +227,7 @@ public class DocumentServiceImpl implements IDocumentService {
 
     public DocumentStatus refreshDocumentStatus(String documentId) {
         DocumentInfoEntity entity = documentInfoRepository.findById(documentId)
-                .orElseThrow(() -> new ServiceException(DocumentErrorCode.DOCUMENT_NOT_FOUND));
+                .orElseThrow(() -> new ServiceException(DocumentError.DOCUMENT_NOT_FOUND));
 
         // 如果状态不是正在上传
         if (entity.getDocumentStatus().getStatus() != DocumentStatusEnum.UPLOADING) {
@@ -239,7 +239,7 @@ public class DocumentServiceImpl implements IDocumentService {
                 storageRecordDTO = remoteStorageService.getFileRecord(entity.getSourceObjectKey()).getData();
             } catch (Exception e) {
                 log.warn("存储文件状态获取失败 DocumentId={}", documentId, e);
-                throw new ServiceException(DocumentErrorCode.DOCUMENT_OPERATION_ERROR, e.getMessage());
+                throw new ServiceException(DocumentError.DOCUMENT_STORAGE_STATUS_GET_FAILED, e.getMessage());
             }
             if (storageRecordDTO != null) { // 未上传完成的文件无法获取storageRecordDTO
                 entity.setDocumentStatus(new DocumentStatus(DocumentStatusEnum.UPLOADED));
@@ -260,7 +260,7 @@ public class DocumentServiceImpl implements IDocumentService {
     @Override
     public DocumentInfoBase getDocumentInfo(String resourceId) {
         return documentInfoRepository.findByResourceId(resourceId)
-                .orElseThrow(() -> new ServiceException(DocumentErrorCode.DOCUMENT_NOT_FOUND));
+                .orElseThrow(() -> new ServiceException(DocumentError.DOCUMENT_NOT_FOUND));
     }
 
     @Override
@@ -301,7 +301,7 @@ public class DocumentServiceImpl implements IDocumentService {
         } catch (Exception e) {
             log.error("resource 服务注册资源失败 DocumentId={}", documentId, e);
             this.updateStatus(documentId, new DocumentStatus(DocumentStatusEnum.REGISTERING_RES_TIMEOUT));
-            throw new ServiceException(DocumentErrorCode.DOCUMENT_REGISTER_RESOURCE_ERROR, e.getMessage());
+            throw new ServiceException(DocumentError.DOCUMENT_REGISTER_RESOURCE_FAILED, e.getMessage());
         }
         documentInfoRepository.updateResourceIdById(documentId, resourceId);
         this.updateStatus(documentId, new DocumentStatus(DocumentStatusEnum.READY));

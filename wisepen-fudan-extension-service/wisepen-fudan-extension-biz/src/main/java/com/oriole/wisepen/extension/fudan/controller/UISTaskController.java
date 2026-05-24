@@ -4,7 +4,7 @@ import com.oriole.wisepen.common.core.domain.R;
 import com.oriole.wisepen.common.core.exception.ServiceException;
 import com.oriole.wisepen.extension.fudan.cache.RedisCacheManager;
 import com.oriole.wisepen.extension.fudan.domain.dto.FudanUISTaskResultDTO;
-import com.oriole.wisepen.extension.fudan.exception.UISErrorCode;
+import com.oriole.wisepen.extension.fudan.exception.FudanExtensionError;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -20,7 +20,7 @@ public class UISTaskController {
         FudanUISTaskResultDTO result = redisCacheManager.getUisTaskStatus(userId);
 
         if (result == null) {
-            throw new ServiceException(UISErrorCode.TASK_NOT_FOUND);
+            throw new ServiceException(FudanExtensionError.UIS_TASK_NOT_FOUND);
         }
         return R.ok(result);
     }

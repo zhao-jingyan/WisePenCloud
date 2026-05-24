@@ -17,7 +17,7 @@ import com.oriole.wisepen.user.api.enums.Status;
 import com.oriole.wisepen.user.api.enums.UserVerificationMode;
 import com.oriole.wisepen.user.domain.entity.UserEntity;
 import com.oriole.wisepen.user.domain.entity.UserProfileEntity;
-import com.oriole.wisepen.user.exception.UserErrorCode;
+import com.oriole.wisepen.user.exception.UserError;
 import com.oriole.wisepen.user.mapper.UserMapper;
 import com.oriole.wisepen.user.mapper.UserProfileMapper;
 import com.oriole.wisepen.user.strategy.UserVerificationStrategy;
@@ -60,21 +60,17 @@ public class FudanUISVerificationStrategy implements UserVerificationStrategy {
         String uisAccount = (String) payload.get("uisAccount");
         String uisPassword = (String) payload.get("uisPassword");
 
-        if (uisAccount == null || uisPassword == null) {
-            throw new ServiceException(UserErrorCode.USER_VERIFICATION_FUDAN_UIS_ACCOUNT_EMPTY);
-        }
-
-            FudanUISAuthRequestMessage message = FudanUISAuthRequestMessage.builder()
-                    .userId(userId)
-                    .account(uisAccount)
-                    .password(uisPassword)
-                    .build();
+        FudanUISAuthRequestMessage message = FudanUISAuthRequestMessage.builder()
+                .userId(userId)
+                .account(uisAccount)
+                .password(uisPassword)
+                .build();
         try {
             kafkaTemplate.send(MqTopicConstants.FUDAN_UIS_AUTH_REQ, objectMapper.writeValueAsString(message));
             log.info("已向 Fudan Extension Service 派发 Fudan UIS 认证请求，userId: {}", userId);
         } catch (Exception e) {
             log.error("派发 Fudan UIS 认证请求失败 userId: {}", userId, e);
-            throw new ServiceException(UserErrorCode.USER_VERIFICATION_FUDAN_UIS_REQUEST_ERROR);
+            throw new ServiceException(UserError.VERIFICATION_FUDAN_UIS_REQUEST_FAILED);
         }
     }
 
@@ -83,7 +79,7 @@ public class FudanUISVerificationStrategy implements UserVerificationStrategy {
         Long userId = (Long) payload.get("userId");
         R<FudanUISTaskResultDTO> res = remoteFudanExtensionService.getTaskStatus(userId);
         if (res.getCode() != 200 || res.getData() == null) {
-            throw new ServiceException(UserErrorCode.USER_VERIFICATION_FUDAN_UIS_REQUEST_ERROR, res.getMsg());
+            throw new ServiceException(UserError.VERIFICATION_FUDAN_UIS_FAILED, res.getMsg());
         }
         FudanUISTaskResultDTO dto = res.getData();
 
@@ -92,7 +88,7 @@ public class FudanUISVerificationStrategy implements UserVerificationStrategy {
         }
 
         if (dto.getState() < 0) {
-            throw new ServiceException(UserErrorCode.USER_VERIFICATION_FUDAN_UIS_FAILED, dto.getMessage());
+            throw new ServiceException(UserError.VERIFICATION_FUDAN_UIS_FAILED, dto.getMessage());
         }
 
         if (dto.getState() == FudanUISTaskState.WAITING_SCAN.getCode() && dto.getQrBase64() != null) {
@@ -111,7 +107,7 @@ public class FudanUISVerificationStrategy implements UserVerificationStrategy {
                 .ne(UserEntity::getUserId, userId));
         if (existed > 0) {
             log.warn("Fudan UIS 认证落库失败：学号 {} 已被其他账号绑定", campusNo);
-            throw new ServiceException(UserErrorCode.CAMPUS_NO_EXISTED);
+            throw new ServiceException(UserError.VERIFICATION_CAMPUS_NO_ALREADY_EXISTS);
         }
 
         // 设置学号、真实姓名、手机号、邮箱

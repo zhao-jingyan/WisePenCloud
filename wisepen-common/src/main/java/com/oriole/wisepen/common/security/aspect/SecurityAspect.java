@@ -2,9 +2,8 @@ package com.oriole.wisepen.common.security.aspect;
 
 import com.oriole.wisepen.common.core.context.SecurityContextHolder;
 import com.oriole.wisepen.common.core.domain.enums.IdentityType;
-import com.oriole.wisepen.common.security.annotation.CheckLogin;
 import com.oriole.wisepen.common.security.annotation.CheckRole;
-import com.oriole.wisepen.common.security.exception.PermissionErrorCode;
+import com.oriole.wisepen.common.security.exception.PermissionError;
 import com.oriole.wisepen.common.security.exception.PermissionException;
 import org.aspectj.lang.JoinPoint;
 import org.aspectj.lang.annotation.Aspect;
@@ -39,18 +38,18 @@ public class SecurityAspect {
         // 执行登录态校验
         Long userId = SecurityContextHolder.getUserId();
         if (userId == null) {
-            throw new PermissionException(PermissionErrorCode.NOT_LOGIN);
+            throw new PermissionException(PermissionError.NOT_LOGIN);
         }
 
         // 执行角色校验
         if (checkRole != null) {
             IdentityType currentIdentity = SecurityContextHolder.getIdentityType();
             if (currentIdentity == null) {
-                throw new PermissionException(PermissionErrorCode.IDENTITY_UNAUTHORIZED);
+                throw new PermissionException(PermissionError.UNAUTHORIZED);
             }
             // 判断当前身份是否在允许的数组内
             if (!Arrays.asList(checkRole.value()).contains(currentIdentity)) {
-                throw new PermissionException(PermissionErrorCode.IDENTITY_UNAUTHORIZED);
+                throw new PermissionException(PermissionError.UNAUTHORIZED);
             }
         }
     }

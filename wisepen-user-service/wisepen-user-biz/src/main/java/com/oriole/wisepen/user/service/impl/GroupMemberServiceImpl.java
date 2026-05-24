@@ -7,7 +7,7 @@ import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.toolkit.CollectionUtils;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.oriole.wisepen.common.core.domain.PageResult;
+import com.oriole.wisepen.common.core.domain.PageR;
 import com.oriole.wisepen.common.core.domain.enums.GroupRoleType;
 import com.oriole.wisepen.common.core.exception.ServiceException;
 import com.oriole.wisepen.user.api.domain.base.UserDisplayBase;
@@ -15,13 +15,12 @@ import com.oriole.wisepen.user.api.domain.dto.req.*;
 import com.oriole.wisepen.user.api.domain.dto.res.GroupMemberDetailResponse;
 import com.oriole.wisepen.user.cache.RedisCacheManager;
 import com.oriole.wisepen.user.domain.entity.*;
-import com.oriole.wisepen.user.exception.GroupErrorCode;
+import com.oriole.wisepen.user.exception.UserError;
 import com.oriole.wisepen.user.mapper.*;
 import com.oriole.wisepen.user.service.IGroupMemberService;
 import com.oriole.wisepen.user.service.IUserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -72,7 +71,7 @@ public class GroupMemberServiceImpl implements IGroupMemberService {
 	@Override
 	public void quitGroup(GroupMemberQuitRequest req, Long userId, GroupRoleType opGroupRoleType) {
 		if (GroupRoleType.OWNER.equals(opGroupRoleType)) {
-			throw new ServiceException(GroupErrorCode.OWNER_QUIT_GROUP); // 群主不可直接退群
+			throw new ServiceException(UserError.CANNOT_QUIT_GROUP_AS_OWNER); // 群主不可直接退群
 		}
 
 		LambdaQueryWrapper<GroupMemberEntity> deleteWrapper = new LambdaQueryWrapper<>();
@@ -91,7 +90,7 @@ public class GroupMemberServiceImpl implements IGroupMemberService {
 				.collect(Collectors.toSet()); // 不能踢自己
 
 		if (targetUserIdSet.isEmpty()) {
-			throw new ServiceException(GroupErrorCode.TARGET_MEMBER_NOT_EXIST);
+			throw new ServiceException(UserError.GROUP_MEMBER_NOT_FOUND);
 		}
 
 		LambdaQueryWrapper<GroupMemberEntity> wrapper = new LambdaQueryWrapper<>();
@@ -100,7 +99,7 @@ public class GroupMemberServiceImpl implements IGroupMemberService {
 		List<GroupMemberEntity> targetMembers = groupMemberMapper.selectList(wrapper);
 
 		if (targetMembers.isEmpty()) {
-			throw new ServiceException(GroupErrorCode.TARGET_MEMBER_NOT_EXIST);
+			throw new ServiceException(UserError.GROUP_MEMBER_NOT_FOUND);
 		}
 
 		List<Long> validUserIdsToDelete = new ArrayList<>(); // 收集符合踢出条件的 userId
@@ -113,7 +112,7 @@ public class GroupMemberServiceImpl implements IGroupMemberService {
 		}
 
 		if (validUserIdsToDelete.isEmpty()) {
-			throw new ServiceException(GroupErrorCode.TARGET_MEMBER_NOT_EXIST);
+			throw new ServiceException(UserError.GROUP_MEMBER_NOT_FOUND);
 		}
 
 		LambdaQueryWrapper<GroupMemberEntity> deleteWrapper = new LambdaQueryWrapper<>();
@@ -136,7 +135,7 @@ public class GroupMemberServiceImpl implements IGroupMemberService {
 		GroupMemberEntity memberEntity = groupMemberMapper.selectOne(wrapper);
 
 		if (memberEntity == null) {
-			throw new ServiceException(GroupErrorCode.TARGET_MEMBER_NOT_EXIST);
+			throw new ServiceException(UserError.GROUP_MEMBER_NOT_FOUND);
 		}
 
 		UserDisplayBase userInfo = userService.getUserDisplayInfoByIds(Set.of(userId)).get(userId);
@@ -149,7 +148,7 @@ public class GroupMemberServiceImpl implements IGroupMemberService {
 	}
 
 	@Override
-	public PageResult<GroupMemberDetailResponse> getGroupMemberList(Long groupId, int page, int size) {
+	public PageR<GroupMemberDetailResponse> getGroupMemberList(Long groupId, int page, int size) {
 		Page<GroupMemberEntity> pageParam = new Page<>(page, size);
 		LambdaQueryWrapper<GroupMemberEntity> wrapper = new LambdaQueryWrapper<>();
 		wrapper.eq(GroupMemberEntity::getGroupId, groupId)
@@ -164,7 +163,7 @@ public class GroupMemberServiceImpl implements IGroupMemberService {
 				.map(GroupMemberEntity::getUserId)
 				.collect(Collectors.toSet());
 
-		PageResult<GroupMemberDetailResponse> pageResult = new PageResult<>(memberPage.getTotal(), page, size);
+		PageR<GroupMemberDetailResponse> pageR = new PageR<>(memberPage.getTotal(), page, size);
 
 		Map<Long, UserDisplayBase> userMap = userService.getUserDisplayInfoByIds(userIds);
 
@@ -176,8 +175,8 @@ public class GroupMemberServiceImpl implements IGroupMemberService {
 			return resp;
 		}).collect(Collectors.toList());
 
-		pageResult.addAll(records);
-		return pageResult;
+		pageR.addAll(records);
+		return pageR;
 	}
 
 	@Override
@@ -187,7 +186,7 @@ public class GroupMemberServiceImpl implements IGroupMemberService {
 				.collect(Collectors.toSet()); // 不能更新自己的权限
 
 		if (targetUserIdSet.isEmpty()) {
-			throw new ServiceException(GroupErrorCode.TARGET_MEMBER_NOT_EXIST);
+			throw new ServiceException(UserError.GROUP_MEMBER_NOT_FOUND);
 		}
 
 		LambdaQueryWrapper<GroupMemberEntity> queryWrapper = new LambdaQueryWrapper<>();
@@ -196,7 +195,7 @@ public class GroupMemberServiceImpl implements IGroupMemberService {
 		List<GroupMemberEntity> existMembers = groupMemberMapper.selectList(queryWrapper);
 
 		if (existMembers.isEmpty()) {
-			throw new ServiceException(GroupErrorCode.TARGET_MEMBER_NOT_EXIST);
+			throw new ServiceException(UserError.GROUP_MEMBER_NOT_FOUND);
 		}
 
 		List<Long> actualUserIdsToUpdate = existMembers.stream()

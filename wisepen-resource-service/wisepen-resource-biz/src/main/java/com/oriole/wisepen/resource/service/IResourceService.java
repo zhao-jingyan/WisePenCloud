@@ -1,6 +1,6 @@
 package com.oriole.wisepen.resource.service;
 
-import com.oriole.wisepen.common.core.domain.PageResult;
+import com.oriole.wisepen.common.core.domain.PageR;
 import com.oriole.wisepen.common.core.domain.enums.GroupRoleType;
 import com.oriole.wisepen.common.core.domain.enums.list.QueryLogicEnum;
 import com.oriole.wisepen.common.core.domain.enums.list.SortDirectionEnum;
@@ -12,7 +12,6 @@ import com.oriole.wisepen.resource.domain.dto.res.ResourceItemResponse;
 import com.oriole.wisepen.resource.enums.ResourceSortBy;
 
 import java.util.List;
-import java.util.Map;
 
 public interface IResourceService {
 
@@ -28,11 +27,11 @@ public interface IResourceService {
 
     void updateResourceActionPermission(ResourceUpdateActionPermissionRequest req);
 
-    PageResult<ResourceItemResponse> listResources(String currentUserId,
-                                                   String groupId, GroupRoleType userGroupRole,
-                                                   List<String> tagIds, QueryLogicEnum tagQueryLogicMode,
-                                                   String resourceType, int page, int size,
-                                                   ResourceSortBy sortBy, SortDirectionEnum sortDir);
+    PageR<ResourceItemResponse> listResources(String currentUserId,
+                                              String groupId, GroupRoleType userGroupRole,
+                                              List<String> tagIds, QueryLogicEnum tagQueryLogicMode,
+                                              String resourceType, int page, int size,
+                                              ResourceSortBy sortBy, SortDirectionEnum sortDir);
 
     void softRemoveResources(List<String> resourceIds);
 

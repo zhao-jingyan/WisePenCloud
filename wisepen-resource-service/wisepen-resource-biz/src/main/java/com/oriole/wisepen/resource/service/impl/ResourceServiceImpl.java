@@ -2,7 +2,7 @@ package com.oriole.wisepen.resource.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.bean.copier.CopyOptions;
-import com.oriole.wisepen.common.core.domain.PageResult;
+import com.oriole.wisepen.common.core.domain.PageR;
 import com.oriole.wisepen.common.core.domain.enums.GroupRoleType;
 import com.oriole.wisepen.common.core.domain.enums.list.QueryLogicEnum;
 import com.oriole.wisepen.common.core.domain.enums.list.SortDirectionEnum;
@@ -26,10 +26,13 @@ import com.oriole.wisepen.resource.enums.ResourceMountMode;
 import com.oriole.wisepen.resource.event.TagChangedEvent;
 import com.oriole.wisepen.resource.event.TagDeletedEvent;
 import com.oriole.wisepen.resource.event.TagTrashedEvent;
-import com.oriole.wisepen.resource.exception.ResPermissionErrorCode;
+import com.oriole.wisepen.resource.exception.ResourceError;
+import com.oriole.wisepen.resource.domain.entity.ResourceInteractionInfoEntity;
 import com.oriole.wisepen.resource.repository.CustomResourceItemRepository;
 import com.oriole.wisepen.resource.repository.GroupResConfigRepository;
+import com.oriole.wisepen.resource.repository.ResourceInteractionInfoRepository;
 import com.oriole.wisepen.resource.repository.ResourceItemRepository;
+import com.oriole.wisepen.resource.repository.ResourceUserInteractRecordRepository;
 import com.oriole.wisepen.resource.repository.TagRepository;
 import com.oriole.wisepen.resource.enums.FileOrganizationLogic;
 import com.oriole.wisepen.resource.mq.IEventPublisher;
@@ -50,6 +53,7 @@ import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.stereotype.Service;
+
 import org.springframework.transaction.event.TransactionalEventListener;
 import org.springframework.util.StringUtils;
 
@@ -69,6 +73,8 @@ public class ResourceServiceImpl implements IResourceService {
     private final ResourceItemRepository resourceItemRepository;
     private final CustomResourceItemRepository customResourceItemRepository;
     private final GroupResConfigRepository groupResConfigRepository;
+    private final ResourceInteractionInfoRepository resourceInteractionInfoRepository;
+    private final ResourceUserInteractRecordRepository resourceUserInteractRecordRepository;
 
     private final IEventPublisher eventPublisher;
     private final MongoTemplate mongoTemplate;
@@ -120,18 +126,18 @@ public class ResourceServiceImpl implements IResourceService {
     @Override
     public void assertResourceOwner(String resourceId, String userId) {
         ResourceItemEntity entity = resourceItemRepository.findById(resourceId)
-                .orElseThrow(() -> new ServiceException(ResPermissionErrorCode.RESOURCE_NOT_FOUND));
+                .orElseThrow(() -> new ServiceException(ResourceError.RESOURCE_NOT_FOUND));
         if (!userId.equals(entity.getOwnerId())) {
             log.warn("resource permission denied resourceId={} userId={} ownerId={}",
                     resourceId, userId, entity.getOwnerId());
-            throw new ServiceException(ResPermissionErrorCode.RESOURCE_PERMISSION_DENIED);
+            throw new ServiceException(ResourceError.RESOURCE_PERMISSION_DENIED);
         }
     }
 
     @Override
     public void renameResource(ResourceRenameRequest req) {
         ResourceItemEntity entity = resourceItemRepository.findById(req.getResourceId())
-                .orElseThrow(() -> new ServiceException(ResPermissionErrorCode.RESOURCE_NOT_FOUND));
+                .orElseThrow(() -> new ServiceException(ResourceError.RESOURCE_NOT_FOUND));
 
         String oldName = entity.getResourceName();
         entity.setResourceName(req.getNewName());
@@ -147,7 +153,7 @@ public class ResourceServiceImpl implements IResourceService {
         List<String> tagIds = req.getTagIds();
 
         ResourceItemEntity entity = resourceItemRepository.findById(resourceId)
-                .orElseThrow(() -> new ServiceException(ResPermissionErrorCode.RESOURCE_NOT_FOUND));
+                .orElseThrow(() -> new ServiceException(ResourceError.RESOURCE_NOT_FOUND));
 
         List<GroupTagBind> groupBinds = entity.getGroupBinds();
 
@@ -161,7 +167,7 @@ public class ResourceServiceImpl implements IResourceService {
         if (tagIds == null || tagIds.isEmpty()) {
             // 个人空间的资源不允许被清空标签
             if (groupId != null && groupId.startsWith(ResourceConstants.PERSONAL_GROUP_PREFIX)) {
-                throw new ServiceException(ResPermissionErrorCode.PERSONAL_SPACE_MUST_HAVE_ONE_PATH);
+                throw new ServiceException(ResourceError.CANNOT_BIND_RESOURCE_TO_MULTIPLE_PATH_NODES);
             }
             // 本次操作清空了该组所有标签，从列表中移除该组
             groupBinds.removeIf(bind -> bind.getGroupId().equals(groupId));
@@ -171,22 +177,22 @@ public class ResourceServiceImpl implements IResourceService {
             // 检查Tag是否存在
             List<TagEntity> validTags = tagRepository.findAllById(req.getTagIds());
             if (validTags.size() != req.getTagIds().size()) {
-                throw new ServiceException(ResPermissionErrorCode.TAG_NOT_FOUND); // 包含无效的标签ID
+                throw new ServiceException(ResourceError.TAG_NODE_NOT_FOUND); // 包含无效的标签ID
             }
             boolean allBelongToGroup = validTags.stream().allMatch(tag -> groupId.equals(tag.getGroupId()));
             if (!allBelongToGroup) {
-                throw new ServiceException(ResPermissionErrorCode.TAG_NOT_FOUND); // 包含无效的标签ID（实际上是跨空间越权挂载，但不返回真实原因）
+                throw new ServiceException(ResourceError.TAG_NODE_NOT_FOUND); // 包含无效的标签ID（实际上是跨空间越权挂载，但不返回真实原因）
             }
 
             if (groupId.startsWith(ResourceConstants.PERSONAL_GROUP_PREFIX)) {
                 // 校验个人空间：必须有且仅有 1 个 isPath = true 的节点
                 List<TagEntity> pathTags =  validTags.stream().filter(tag -> Boolean.TRUE.equals(tag.getIsPath())).toList();
                 if (pathTags.size() != 1) {
-                    throw new ServiceException(ResPermissionErrorCode.PERSONAL_SPACE_MUST_HAVE_ONE_PATH);
+                    throw new ServiceException(ResourceError.CANNOT_BIND_RESOURCE_TO_MULTIPLE_PATH_NODES);
                 }
                 // 首位 (Index 0) 的节点必须是这个唯一的 isPath 节点
                 if (!tagIds.getFirst().equals(pathTags.getFirst().getTagId())) {
-                    throw new ServiceException(ResPermissionErrorCode.PATH_MUST_BE_FIRST_TAG);
+                    throw new ServiceException(ResourceError.CANNOT_PLACE_RESOURCE_PATH_TAG_AFTER_TAGS);
                 }
 
                 // 检查目标路径是否属于回收站
@@ -201,7 +207,7 @@ public class ResourceServiceImpl implements IResourceService {
                 // 小组 FOLDER 模式：同一小组内每个资源至多挂载一个标签
                 FileOrganizationLogic logic = groupResService.getFileOrgLogic(groupId);
                 if (FileOrganizationLogic.FOLDER == logic && tagIds.size() > 1) {
-                    throw new ServiceException(ResPermissionErrorCode.FOLDER_MODE_ONLY_ONE_TAG);
+                    throw new ServiceException(ResourceError.CANNOT_BIND_MULTIPLE_RESOURCE_TAGS_IN_FOLDER_MODE);
                 }
             }
 
@@ -268,7 +274,7 @@ public class ResourceServiceImpl implements IResourceService {
     @Override
     public void updateResourceActionPermission(ResourceUpdateActionPermissionRequest req){
         ResourceItemEntity entity = resourceItemRepository.findById(req.getResourceId())
-                .orElseThrow(() -> new ServiceException(ResPermissionErrorCode.RESOURCE_NOT_FOUND));
+                .orElseThrow(() -> new ServiceException(ResourceError.RESOURCE_NOT_FOUND));
 
         // 前端传 null 代表清空覆盖规则，走默认群组标签规则 (下同)
         if (req.getOverrideGrantedActions() != null) {
@@ -299,7 +305,7 @@ public class ResourceServiceImpl implements IResourceService {
     @Override
     public ResourceItemResponse getResourceInfo(ResourceInfoGetReqDTO dto) {
         ResourceItemEntity entity = resourceItemRepository.findById(dto.getResourceId())
-                .orElseThrow(() -> new ServiceException(ResPermissionErrorCode.RESOURCE_NOT_FOUND));
+                .orElseThrow(() -> new ServiceException(ResourceError.RESOURCE_NOT_FOUND));
 
         // 预计算 ACL 快速鉴权 (拦截非法越权访问)
         int currentActionsMask = 0;
@@ -338,7 +344,7 @@ public class ResourceServiceImpl implements IResourceService {
         if (!ResourceAction.hasAction(currentActionsMask, ResourceAction.VIEW)) {
             log.warn("resource permission denied resourceId={} userId={} actionMask={}",
                     entity.getResourceId(), dto.getUserId(), currentActionsMask);
-            throw new ServiceException(ResPermissionErrorCode.RESOURCE_PERMISSION_DENIED);
+            throw new ServiceException(ResourceError.RESOURCE_PERMISSION_DENIED);
         }
 
         // 组装响应数据
@@ -400,15 +406,20 @@ public class ResourceServiceImpl implements IResourceService {
                 resp.setSpecifiedUsersGrantedActions(userActionsMap);
             }
         }
+
+        // 新增互动信息
+        ResourceInteractionInfoEntity resourceInteractionInfo = resourceInteractionInfoRepository.findById(entity.getResourceId())
+            .orElseGet(ResourceInteractionInfoEntity::new);
+        resp.setResourceInteractionInfo(resourceInteractionInfo);
         return resp;
     }
 
     @Override
-    public PageResult<ResourceItemResponse> listResources(String currentUserId,
-                                                          String groupId, GroupRoleType userGroupRole,
-                                                          List<String> tagIds, QueryLogicEnum tagQueryLogicMode,
-                                                          String resourceType, int page, int size,
-                                                          ResourceSortBy sortBy, SortDirectionEnum sortDir) {
+    public PageR<ResourceItemResponse> listResources(String currentUserId,
+                                                     String groupId, GroupRoleType userGroupRole,
+                                                     List<String> tagIds, QueryLogicEnum tagQueryLogicMode,
+                                                     String resourceType, int page, int size,
+                                                     ResourceSortBy sortBy, SortDirectionEnum sortDir) {
 
         List<String> excludeTrashIds = null;
         // 如果是个人空间，且没有明确指定要查回收站，必须把回收站设为黑名单
@@ -475,9 +486,21 @@ public class ResourceServiceImpl implements IResourceService {
             return resp;
         }).collect(Collectors.toList());
 
-        PageResult<ResourceItemResponse> pageResult = new PageResult<>(entityPage.getTotalElements(), page, size);
-        pageResult.addAll(responses);
-        return pageResult;
+        // 批量聚合互动信息，避免 N+1 查询
+        List<String> resourceIds = entityPage.getContent().stream()
+                .map(ResourceItemEntity::getResourceId)
+                .collect(Collectors.toList());
+        Map<String, ResourceInteractionInfoEntity> interactInfoMap = resourceInteractionInfoRepository.findByResourceIdIn(resourceIds)
+                .stream()
+                .collect(Collectors.toMap(ResourceInteractionInfoEntity::getResourceId, e -> e));
+
+        responses.forEach(resp -> {
+            resp.setResourceInteractionInfo(interactInfoMap.getOrDefault(resp.getResourceId(), new ResourceInteractionInfoEntity()));
+        });
+
+        PageR<ResourceItemResponse> pageR = new PageR<>(entityPage.getTotalElements(), page, size);
+        pageR.addAll(responses);
+        return pageR;
     }
 
 
@@ -490,7 +513,7 @@ public class ResourceServiceImpl implements IResourceService {
             String pathTagID = !StringUtils.hasText(dto.getPathTagId()) ?
                     tagRepository.findByGroupIdAndParentIdAndTagName(
                                 ResourceConstants.PERSONAL_GROUP_PREFIX + dto.getOwnerId(), "0", ResourceConstants.ROOT_TAG_NAME)
-                        .orElseThrow(() -> new ServiceException(ResPermissionErrorCode.TAG_NOT_FOUND)).getTagId()
+                        .orElseThrow(() -> new ServiceException(ResourceError.TAG_NODE_NOT_FOUND)).getTagId()
                     :
                     dto.getPathTagId();
             List<String> targetTagIds = Collections.singletonList(pathTagID);
@@ -506,6 +529,9 @@ public class ResourceServiceImpl implements IResourceService {
             log.warn("resourceItem compensated resourceId={}", entity.getResourceId(), e);
             throw e;
         }
+        // 同步初始化互动信息记录
+        resourceInteractionInfoRepository.save(new ResourceInteractionInfoEntity(entity.getResourceId()));
+
         log.info("resource created resourceId={} ownerId={} resourceType={} pathTagId={}",
                 entity.getResourceId(), dto.getOwnerId(), dto.getResourceType(), dto.getPathTagId());
         return entity.getResourceId();
@@ -546,6 +572,12 @@ public class ResourceServiceImpl implements IResourceService {
 
         long deletedCount = mongoTemplate.remove(query, RESOURCE_TRASH_COLLECTION).getDeletedCount();
         if (deletedCount > 0) {
+            List<String> deletedResourceIds = expiredResources.stream()
+                .map(ResourceItemEntity::getResourceId)
+                .collect(Collectors.toList());
+            resourceInteractionInfoRepository.deleteAllByResourceIdIn(deletedResourceIds);
+            resourceUserInteractRecordRepository.deleteAllByResourceIdIn(deletedResourceIds);
+
             log.info("resources deleted mode=hard count={} resourceIds={}",
                     deletedCount, summarizeIds(resourceIds));
             // 发送 Kafka 广播，通知文件存储等下游微服务抹除物理文件

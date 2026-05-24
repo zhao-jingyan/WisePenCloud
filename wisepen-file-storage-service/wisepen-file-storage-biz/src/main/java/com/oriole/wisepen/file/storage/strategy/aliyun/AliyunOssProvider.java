@@ -17,11 +17,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.oriole.wisepen.common.core.exception.ServiceException;
 import com.oriole.wisepen.file.storage.api.domain.base.StorageRecordBase;
 import com.oriole.wisepen.file.storage.api.domain.base.UploadUrlBase;
-import com.oriole.wisepen.file.storage.api.domain.dto.StorageRecordDTO;
 import com.oriole.wisepen.file.storage.api.domain.dto.StsTokenDTO;
 import com.oriole.wisepen.file.storage.api.domain.dto.UploadInitRespDTO;
 import com.oriole.wisepen.file.storage.domain.entity.StorageConfigEntity;
-import com.oriole.wisepen.file.storage.exception.StorageErrorCode;
+import com.oriole.wisepen.file.storage.exception.FileStorageError;
 import com.oriole.wisepen.file.storage.strategy.StorageProvider;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.multipart.MultipartFile;
@@ -101,7 +100,7 @@ public class AliyunOssProvider implements StorageProvider {
 
         } catch (JsonProcessingException e) {
             log.error("构建 OSS 回调策略 JSON 失败", e);
-            throw new ServiceException(StorageErrorCode.CALLBACK_POLICY_GENERATE_FAILED);
+            throw new ServiceException(FileStorageError.STORAGE_PROVIDER_GENERATE_CALLBACK_POLICY_FAILED);
         }
     }
 
@@ -114,7 +113,7 @@ public class AliyunOssProvider implements StorageProvider {
             return url.toString();
         } catch (Exception e) {
             log.error("OSS Generate Presigned Url 失败: {}", objectKey, e);
-            throw new ServiceException(StorageErrorCode.FILE_DOWNLOAD_ERROR);
+            throw new ServiceException(FileStorageError.STORAGE_PROVIDER_GET_FILE_DOWNLOAD_URL_FAILED);
         }
     }
 
@@ -125,7 +124,7 @@ public class AliyunOssProvider implements StorageProvider {
             ossClient.copyObject(config.getBucketName(), sourceKey, config.getBucketName(), targetKey);
         } catch (Exception e) {
             log.error("OSS CopyObject 失败: source={}, target={}", sourceKey, targetKey, e);
-            throw new ServiceException(StorageErrorCode.FILE_COPY_ERROR);
+            throw new ServiceException(FileStorageError.STORAGE_PROVIDER_COPY_FILE_FAILED);
         }
     }
 
@@ -135,7 +134,7 @@ public class AliyunOssProvider implements StorageProvider {
             ossClient.deleteObject(config.getBucketName(), objectKey);
         } catch (Exception e) {
             log.error("OSS DeleteObject 失败: {}", objectKey, e);
-            throw new ServiceException(StorageErrorCode.FILE_DELETE_ERROR);
+            throw new ServiceException(FileStorageError.STORAGE_PROVIDER_DELETE_FILE_FAILED);
         }
     }
 
@@ -146,7 +145,7 @@ public class AliyunOssProvider implements StorageProvider {
             ossClient.putObject(config.getBucketName(), objectKey, inputStream);
         } catch (Exception e) {
             log.error("OSS PutObject (SmallFile) 失败: {}", objectKey, e);
-            throw new ServiceException(StorageErrorCode.FILE_UPLOAD_ERROR);
+            throw new ServiceException(FileStorageError.STORAGE_PROVIDER_UPLOAD_FILE_FAILED);
         }
     }
 
@@ -194,7 +193,7 @@ public class AliyunOssProvider implements StorageProvider {
 
         } catch (Exception e) {
             log.error("生成 STS Token 失败: pathPrefix={}, configId={}", pathPrefix, config.getId(), e);
-            throw new ServiceException(StorageErrorCode.STS_TOKEN_GENERATE_FAILED);
+            throw new ServiceException(FileStorageError.STORAGE_PROVIDER_GENERATE_STS_TOKEN_FAILED);
         }
     }
 
@@ -270,7 +269,7 @@ public class AliyunOssProvider implements StorageProvider {
                 return null;
             }
             log.error("查询 OSS 元数据失败: {}", objectKey, e);
-            throw new ServiceException(StorageErrorCode.FILE_READ_ERROR);
+            throw new ServiceException(FileStorageError.STORAGE_PROVIDER_READ_FILE_FAILED);
         }
     }
 

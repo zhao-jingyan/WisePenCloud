@@ -10,14 +10,14 @@ import java.util.List;
 
 @Data
 @NoArgsConstructor
-public class PageResult<T> implements Serializable {
+public class PageR<T> implements Serializable {
     private List<T> list = new ArrayList<>();
     private long total;
     private int page;
     private int size;
     private int totalPage;
 
-    public PageResult(long total, int page, int size) {
+    public PageR(long total, int page, int size) {
         this.total = total;
         this.page = page;
         this.size = size;

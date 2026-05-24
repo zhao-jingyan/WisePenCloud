@@ -19,7 +19,7 @@ public enum IdentityType {
     @JsonValue
     private final int code;
 
-    private final String desc;
+    private final String value;
 
     /**
      * 根据 code 查找枚举
