@@ -54,10 +54,9 @@ import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
-import java.util.concurrent.TimeUnit;
+import com.oriole.wisepen.resource.cache.RedisCacheManager;
 import org.springframework.transaction.event.TransactionalEventListener;
 import org.springframework.util.StringUtils;
 
@@ -88,7 +87,7 @@ public class ResourceServiceImpl implements IResourceService {
     private final ITagService tagService;
 
     private final RemoteUserService remoteUserService;
-    private final StringRedisTemplate stringRedisTemplate;
+    private final RedisCacheManager redisCacheManager;
 
     /** 阅读量去重窗口时长（分钟），可通过配置文件调整 */
     @Value("${wisepen.resource.read-dedup-ttl-minutes:10}")
@@ -388,12 +387,10 @@ public class ResourceServiceImpl implements IResourceService {
 
         // 聚合互动信息：readCount / likeCount / scoreAvg 来自互动信息表
         ResourceInteractInfoEntity interactInfo = resourceInteractInfoRepository.findById(entity.getResourceId())
-            .orElse(null);
-        resp.setReadCount(interactInfo != null && interactInfo.getReadCount() != null
-            ? interactInfo.getReadCount() : 0L);
-        resp.setLikeCount(interactInfo != null && interactInfo.getLikeCount() != null
-            ? interactInfo.getLikeCount() : 0L);
-        resp.setScoreAvg(interactInfo != null ? interactInfo.getScoreAvg() : null);
+            .orElseGet(ResourceInteractInfoEntity::new);
+        resp.setReadCount(interactInfo.getReadCount());
+        resp.setLikeCount(interactInfo.getLikeCount());
+        resp.setScoreAvg(interactInfo.getScoreAvg());
 
         // 回填当前用户点赞/评分状态
         resp.setLiked(false);
@@ -403,6 +400,15 @@ public class ResourceServiceImpl implements IResourceService {
                 resp.setLiked(Boolean.TRUE.equals(userRecord.getLiked()));
                 resp.setUserScore(userRecord.getScore());
             });
+
+        // 有效阅读计数：Redis 窗口内去重，首次阅读原子自增 readCount
+        Boolean isFirstReadInWindow = redisCacheManager.tryMarkFirstRead(
+                entity.getResourceId(), dto.getUserId().toString(), readDedupTtlMinutes);
+        if (Boolean.TRUE.equals(isFirstReadInWindow)) {
+            customResourceInteractInfoRepository.incrementReadCount(entity.getResourceId(), 1);
+            log.info("readCount incremented resourceId={} userId={}", entity.getResourceId(), dto.getUserId());
+        }
+
         return resp;
     }
 
@@ -486,10 +492,10 @@ public class ResourceServiceImpl implements IResourceService {
                 .stream()
                 .collect(Collectors.toMap(ResourceInteractInfoEntity::getResourceId, e -> e));
         responses.forEach(resp -> {
-            ResourceInteractInfoEntity info = interactInfoMap.get(resp.getResourceId());
-            resp.setReadCount(info != null && info.getReadCount() != null ? info.getReadCount() : 0L);
-            resp.setLikeCount(info != null && info.getLikeCount() != null ? info.getLikeCount() : 0L);
-            resp.setScoreAvg(info != null ? info.getScoreAvg() : null);
+            ResourceInteractInfoEntity info = interactInfoMap.getOrDefault(resp.getResourceId(), new ResourceInteractInfoEntity());
+            resp.setReadCount(info.getReadCount());
+            resp.setLikeCount(info.getLikeCount());
+            resp.setScoreAvg(info.getScoreAvg());
         });
 
         PageR<ResourceItemResponse> pageR = new PageR<>(entityPage.getTotalElements(), page, size);
@@ -524,13 +530,7 @@ public class ResourceServiceImpl implements IResourceService {
             throw e;
         }
         // 同步初始化互动信息记录，确保新资源首读前就有明确的 readCount = 0
-        ResourceInteractInfoEntity interactInfo = new ResourceInteractInfoEntity();
-        interactInfo.setResourceId(entity.getResourceId());
-        interactInfo.setReadCount(0L);
-        interactInfo.setLikeCount(0L);
-        interactInfo.setScoreCount(0);
-        interactInfo.setScoreTotal(0L);
-        resourceInteractInfoRepository.save(interactInfo);
+        resourceInteractInfoRepository.save(new ResourceInteractInfoEntity(entity.getResourceId()));
 
         log.info("resource created resourceId={} ownerId={} resourceType={} pathTagId={}",
                 entity.getResourceId(), dto.getOwnerId(), dto.getResourceType(), dto.getPathTagId());
@@ -915,39 +915,6 @@ public class ResourceServiceImpl implements IResourceService {
         }
 
         return result;
-    }
-
-    @Override
-    public void recordResourceRead(ResourceReadRecordReqDTO dto) {
-        // 校验资源是否存在
-        if (!resourceItemRepository.existsById(dto.getResourceId())) {
-            throw new ServiceException(ResourceError.RESOURCE_NOT_FOUND);
-        }
-
-        // userId 为 null 时无法区分用户，不能进行用户级去重，直接拒绝计数并告警。
-        // 正常链路中 @CheckLogin 已保证 userId 非空，此处为防御性校验。
-        if (dto.getUserId() == null) {
-            log.warn("recordResourceRead skipped: userId is null, cannot perform per-user dedup. "
-                    + "resourceId={} source={}", dto.getResourceId(), dto.getSource());
-            return;
-        }
-
-        // Redis 去重：对同一用户 + 同一资源，在 TTL 窗口内只计一次。
-        // key 格式：res:read:{resourceId}:{userId}，不同用户拥有独立 key，互不干扰。
-        String dedupKey = "res:read:" + dto.getResourceId() + ":" + dto.getUserId();
-        Boolean isFirstReadInWindow = stringRedisTemplate.opsForValue()
-                .setIfAbsent(dedupKey, "1", readDedupTtlMinutes, TimeUnit.MINUTES);
-
-        if (Boolean.TRUE.equals(isFirstReadInWindow)) {
-            // 窗口内首次阅读，原子自增互动信息表中的 readCount（upsert：老资源无记录时自动补建）
-            customResourceInteractInfoRepository.incrementReadCount(dto.getResourceId(), 1L);
-            log.info("readCount incremented resourceId={} userId={} source={}",
-                    dto.getResourceId(), dto.getUserId(), dto.getSource());
-        } else {
-            // 窗口内重复阅读，不计入
-            log.debug("readCount skipped (dedup) resourceId={} userId={} source={}",
-                    dto.getResourceId(), dto.getUserId(), dto.getSource());
-        }
     }
 
     /**

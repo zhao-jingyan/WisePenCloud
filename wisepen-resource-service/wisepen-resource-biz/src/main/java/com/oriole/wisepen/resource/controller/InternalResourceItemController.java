@@ -56,11 +56,5 @@ public class InternalResourceItemController implements RemoteResourceService {
         return R.ok();
     }
 
-    // 阅读事件上报（由 note/document 等业务服务调用）
-    @PostMapping("/recordRead")
-    public R<Void> recordResourceRead(@Validated @RequestBody ResourceReadRecordReqDTO dto) {
-        resourceService.recordResourceRead(dto);
-        return R.ok();
-    }
 
 }

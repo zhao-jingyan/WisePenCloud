@@ -21,8 +21,7 @@ public class CustomResourceUserInteractRecordRepository {
     }
 
     /**
-     * 原子写入点赞状态，返回写入前的文档。
-     * upsert=true：首次操作自动创建记录；returnNew=false：返回旧状态供调用方计算 likeCount 增量。
+     * 原子写入点赞状态（upsert：首次操作自动创建记录）。
      */
     public ResourceUserInteractRecordEntity findAndSetLiked(String resourceId, String userId, boolean liked) {
         Query query = Query.query(

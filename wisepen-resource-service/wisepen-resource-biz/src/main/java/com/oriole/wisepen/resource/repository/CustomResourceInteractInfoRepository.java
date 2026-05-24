@@ -22,7 +22,7 @@ public class CustomResourceInteractInfoRepository {
     /**
      * 原子累加阅读量，upsert 兼容历史遗留资源（文档不存在时自动创建）。
      */
-    public void incrementReadCount(String resourceId, long delta) {
+    public void incrementReadCount(String resourceId, int delta) {
         Query query = Query.query(Criteria.where("_id").is(resourceId));
         Update update = new Update()
                 .inc("readCount", delta)
@@ -33,7 +33,7 @@ public class CustomResourceInteractInfoRepository {
     /**
      * 原子累加点赞数，upsert 兼容历史遗留资源（首次点赞时自动创建统计文档）。
      */
-    public void incrementLikeCount(String resourceId, long delta) {
+    public void incrementLikeCount(String resourceId, int delta) {
         Query query = Query.query(Criteria.where("_id").is(resourceId));
         Update update = new Update()
                 .inc("likeCount", delta)
@@ -46,9 +46,9 @@ public class CustomResourceInteractInfoRepository {
      * scoreAvg 为派生值，不存储，由 ResourceInteractInfoEntity.getScoreAvg() 在读取时计算。
      *
      * @param scoreCountDelta 首次评分传 1，覆盖评分传 0
-     * @param scoreTotalDelta 分数增量；Long 类型确保 upsert 创建文档时 MongoDB 存储为 NumberLong
+     * @param scoreTotalDelta 分数增量
      */
-    public void updateScoreStats(String resourceId, int scoreCountDelta, long scoreTotalDelta) {
+    public void updateScoreStats(String resourceId, int scoreCountDelta, int scoreTotalDelta) {
         Query query = Query.query(Criteria.where("_id").is(resourceId));
         Update update = new Update()
                 .inc("scoreCount", scoreCountDelta)

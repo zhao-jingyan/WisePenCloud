@@ -37,8 +37,4 @@ public interface RemoteResourceService {
     @PostMapping("/internal/resource/dissolveGroup")
     R<Void> dissolveGroup(@RequestParam("groupId") Long groupId);
 
-    @Operation(summary = "上报阅读事件", description = "业务服务在用户查看资源详情时调用，资源服务执行去重后更新阅读量；预览接口不应调用此接口")
-    @PostMapping("/internal/resource/recordRead")
-    R<Void> recordResourceRead(@RequestBody ResourceReadRecordReqDTO dto);
-
 }

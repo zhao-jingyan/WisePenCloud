@@ -24,9 +24,6 @@ public interface ResourceValidationMsg {
 
     String FILE_ORG_LOGIC_NOT_NULL = "资源组织模式不能为空";
 
-    // 阅读上报相关校验
-    String READ_SOURCE_NOT_BLANK = "阅读来源标识不能为空";
-
     // 互动相关校验
     String SCORE_RANGE_INVALID = "评分必须在1到5之间";
 }

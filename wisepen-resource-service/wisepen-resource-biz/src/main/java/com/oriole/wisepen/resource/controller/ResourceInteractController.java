@@ -6,7 +6,6 @@ import com.oriole.wisepen.common.log.annotation.Log;
 import com.oriole.wisepen.common.security.annotation.CheckLogin;
 import com.oriole.wisepen.resource.domain.dto.req.ResourceRateRequest;
 import com.oriole.wisepen.resource.domain.dto.req.ResourceToggleLikeRequest;
-import com.oriole.wisepen.resource.domain.dto.res.ResourceInteractStateResponse;
 import com.oriole.wisepen.resource.service.IResourceInteractService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -29,14 +28,16 @@ public class ResourceInteractController {
     @Operation(summary = "点赞/取消点赞", description = "同一用户对同一资源的点赞状态可反转")
     @Log(title = "资源点赞", businessType = BusinessType.UPDATE)
     @PostMapping("/toggleLike")
-    public R<ResourceInteractStateResponse> toggleLike(@Validated @RequestBody ResourceToggleLikeRequest request) {
-        return R.ok(resourceInteractService.toggleLike(request));
+    public R<Void> toggleLike(@Validated @RequestBody ResourceToggleLikeRequest request) {
+        resourceInteractService.toggleLike(request);
+        return R.ok();
     }
 
     @Operation(summary = "资源评分", description = "对资源进行1-5分评分，支持覆盖更新")
     @Log(title = "资源评分", businessType = BusinessType.UPDATE)
     @PostMapping("/rate")
-    public R<ResourceInteractStateResponse> rate(@Validated @RequestBody ResourceRateRequest request) {
-        return R.ok(resourceInteractService.rateResource(request));
+    public R<Void> rate(@Validated @RequestBody ResourceRateRequest request) {
+        resourceInteractService.rateResource(request);
+        return R.ok();
     }
 }

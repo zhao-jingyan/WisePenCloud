@@ -4,7 +4,6 @@ import com.oriole.wisepen.common.core.context.SecurityContextHolder;
 import com.oriole.wisepen.common.core.exception.ServiceException;
 import com.oriole.wisepen.resource.domain.dto.req.ResourceRateRequest;
 import com.oriole.wisepen.resource.domain.dto.req.ResourceToggleLikeRequest;
-import com.oriole.wisepen.resource.domain.dto.res.ResourceInteractStateResponse;
 import com.oriole.wisepen.resource.domain.entity.ResourceUserInteractRecordEntity;
 import com.oriole.wisepen.resource.exception.ResourceError;
 import com.oriole.wisepen.resource.repository.CustomResourceInteractInfoRepository;
@@ -28,10 +27,9 @@ public class ResourceInteractServiceImpl implements IResourceInteractService {
 
     /**
      * 点赞/取消点赞。
-     * delta 基于 findAndModify 返回的实际旧状态计算，消除同用户并发双击导致的 likeCount 重复计数。
      */
     @Override
-    public ResourceInteractStateResponse toggleLike(ResourceToggleLikeRequest request) {
+    public void toggleLike(ResourceToggleLikeRequest request) {
         assertResourceExists(request.getResourceId());
 
         String userId = SecurityContextHolder.getUserId().toString();
@@ -43,24 +41,11 @@ public class ResourceInteractServiceImpl implements IResourceInteractService {
                 .orElse(false);
         boolean wantLiked = !currentLiked;
 
-        ResourceUserInteractRecordEntity prevRecord =
-                customResourceUserInteractRecordRepository.findAndSetLiked(resourceId, userId, wantLiked);
+        customResourceUserInteractRecordRepository.findAndSetLiked(resourceId, userId, wantLiked);
+        customResourceInteractInfoRepository.incrementLikeCount(resourceId, wantLiked ? 1 : -1);
 
-        boolean actualOldLiked = prevRecord != null && Boolean.TRUE.equals(prevRecord.getLiked());
-        long delta = (wantLiked != actualOldLiked) ? (wantLiked ? 1L : -1L) : 0L;
-        if (delta != 0) {
-            customResourceInteractInfoRepository.incrementLikeCount(resourceId, delta);
-        }
-
-        ResourceInteractStateResponse response = new ResourceInteractStateResponse();
-        response.setResourceId(resourceId);
-        response.setLiked(wantLiked);
-        response.setLikeCount(null);
-        response.setUserScore(null);
-
-        log.info("resource like toggled resourceId={} userId={} actualOldLiked={} wantLiked={} delta={}",
-                resourceId, userId, actualOldLiked, wantLiked, delta);
-        return response;
+        log.info("resource like toggled resourceId={} userId={} wantLiked={}",
+                resourceId, userId, wantLiked);
     }
 
     /**
@@ -68,7 +53,7 @@ public class ResourceInteractServiceImpl implements IResourceInteractService {
      * findAndModify(upsert=true, returnNew=false) 将并发请求串行化，保证每个请求获取到的 oldScore 严格一致。
      */
     @Override
-    public ResourceInteractStateResponse rateResource(ResourceRateRequest request) {
+    public void rateResource(ResourceRateRequest request) {
         assertResourceExists(request.getResourceId());
 
         Integer newScore = request.getScore();
@@ -91,17 +76,8 @@ public class ResourceInteractServiceImpl implements IResourceInteractService {
             customResourceInteractInfoRepository.updateScoreStats(resourceId, 0, newScore - oldScore);
         }
         // oldScore == newScore：重复提交相同分数，幂等
-        ResourceInteractStateResponse response = new ResourceInteractStateResponse();
-        response.setResourceId(resourceId);
-        // 回填当前 liked 状态，方便详情页同时刷新互动区
-        boolean liked = oldRecord != null && Boolean.TRUE.equals(oldRecord.getLiked());
-        response.setLiked(liked);
-        response.setLikeCount(null);
-        response.setUserScore(newScore);
-
         log.info("resource rated resourceId={} userId={} oldScore={} newScore={}",
                 resourceId, userId, oldScore, newScore);
-        return response;
     }
 
     private void assertResourceExists(String resourceId) {

@@ -54,6 +54,4 @@ public interface IResourceService {
 
     void stripGroupPermission(List<String> trashedTagIds);
 
-    // 上报阅读事件。资源服务内部执行 Redis 去重，去重通过后原子自增 readCount。
-    void recordResourceRead(ResourceReadRecordReqDTO dto);
 }

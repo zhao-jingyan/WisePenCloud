@@ -14,7 +14,6 @@ import com.oriole.wisepen.note.service.INoteVersionService;
 import com.oriole.wisepen.resource.domain.dto.ResourceCheckPermissionReqDTO;
 import com.oriole.wisepen.resource.domain.dto.ResourceCheckPermissionResDTO;
 import com.oriole.wisepen.resource.domain.dto.ResourceInfoGetReqDTO;
-import com.oriole.wisepen.resource.domain.dto.ResourceReadRecordReqDTO;
 import com.oriole.wisepen.resource.domain.dto.res.ResourceItemResponse;
 import com.oriole.wisepen.resource.enums.ResourceAccessRole;
 import com.oriole.wisepen.resource.feign.RemoteResourceService;
@@ -72,19 +71,6 @@ public class NoteController {
                 .noteInfo(noteInfo)
                 .authorsDisplay(authorsDisplay)
                 .build();
-
-        // 有效阅读事件上报（fire-and-forget：上报失败不影响用户获取笔记）
-        try {
-            remoteResourceService.recordResourceRead(
-                    ResourceReadRecordReqDTO.builder()
-                            .resourceId(resourceId)
-                            .userId(SecurityContextHolder.getUserId())
-                            .source("NOTE_INFO")
-                            .build()
-            );
-        } catch (Exception e) {
-            log.warn("recordResourceRead failed resourceId={} userId={}", resourceId, SecurityContextHolder.getUserId(), e);
-        }
 
         return R.ok(noteInfoResponse);
     }

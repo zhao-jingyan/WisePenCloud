@@ -14,8 +14,8 @@ import lombok.experimental.SuperBuilder;
 @NoArgsConstructor
 @AllArgsConstructor
 public class ResourceInteractInfoBase {
-    private Long readCount;     // 资源有效阅读量，默认 0
-    private Long likeCount;     // 点赞总数，默认 0
-    private Integer scoreCount; // 评分人数，默认 0
-    private Long scoreTotal;    // 评分总和，默认 0
+    private Integer readCount = 0;   // 资源有效阅读量，默认 0
+    private Integer likeCount = 0;   // 点赞总数，默认 0
+    private Integer scoreCount = 0;  // 评分人数，默认 0
+    private Integer scoreTotal = 0;  // 评分总和，默认 0
 }
