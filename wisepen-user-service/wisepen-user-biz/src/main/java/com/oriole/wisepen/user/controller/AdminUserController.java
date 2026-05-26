@@ -28,9 +28,9 @@ public class AdminUserController {
     public R<PageR<UserEntity>> getUserList(
             @RequestParam(value = "page", defaultValue = "1") int page,
             @RequestParam(value = "size", defaultValue = "20") int size,
-            @RequestParam String keyword,
-            @RequestParam Status status,
-            @RequestParam IdentityType identityType
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) Status status,
+            @RequestParam(required = false) IdentityType identityType
     ) {
         return R.ok(userService.getUserListAdmin(page, size, keyword, status, identityType));
     }
