@@ -9,42 +9,56 @@ version: '3.8'
 
 services:
   user-service:
+    environment:
+      SPRING_CLOUD_INETUTILS_PREFERRED_NETWORKS: '^172\.28\.'
     networks:
       cloud-infra_cloud-net:
         aliases:
           - user-service
 
   system-service:
+    environment:
+      SPRING_CLOUD_INETUTILS_PREFERRED_NETWORKS: '^172\.28\.'
     networks:
       cloud-infra_cloud-net:
         aliases:
           - system-service
 
   resource-service:
+    environment:
+      SPRING_CLOUD_INETUTILS_PREFERRED_NETWORKS: '^172\.28\.'
     networks:
       cloud-infra_cloud-net:
         aliases:
           - resource-service
 
   document-service:
+    environment:
+      SPRING_CLOUD_INETUTILS_PREFERRED_NETWORKS: '^172\.28\.'
     networks:
       cloud-infra_cloud-net:
         aliases:
           - document-service
 
   file-storage-service:
+    environment:
+      SPRING_CLOUD_INETUTILS_PREFERRED_NETWORKS: '^172\.28\.'
     networks:
       cloud-infra_cloud-net:
         aliases:
           - file-storage-service
 
   fudan-extension-service:
+    environment:
+      SPRING_CLOUD_INETUTILS_PREFERRED_NETWORKS: '^172\.28\.'
     networks:
       cloud-infra_cloud-net:
         aliases:
           - fudan-extension-service
 
   note-service:
+    environment:
+      SPRING_CLOUD_INETUTILS_PREFERRED_NETWORKS: '^172\.28\.'
     networks:
       cloud-infra_cloud-net:
         aliases:
