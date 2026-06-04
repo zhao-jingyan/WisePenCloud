@@ -2,7 +2,6 @@ package com.oriole.wisepen.resource.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.bean.copier.CopyOptions;
-import cn.hutool.core.util.IdUtil;
 import com.oriole.wisepen.common.core.domain.PageR;
 import com.oriole.wisepen.common.core.domain.enums.GroupRoleType;
 import com.oriole.wisepen.common.core.domain.enums.list.QueryLogicEnum;
@@ -30,7 +29,7 @@ import com.oriole.wisepen.resource.repository.ResourceInteractionInfoRepository;
 import com.oriole.wisepen.resource.repository.ResourceItemRepository;
 import com.oriole.wisepen.resource.repository.ResourceUserInteractRecordRepository;
 import com.oriole.wisepen.resource.repository.TagRepository;
-import com.oriole.wisepen.resource.mq.IEventPublisher;
+import com.oriole.wisepen.resource.mq.IResourceEventPublisher;
 import com.oriole.wisepen.resource.service.IGroupResService;
 import com.oriole.wisepen.resource.service.IResourceService;
 import com.oriole.wisepen.resource.service.ISearchSyncService;
@@ -72,7 +71,7 @@ public class ResourceServiceImpl implements IResourceService {
     private final ResourceInteractionInfoRepository resourceInteractionInfoRepository;
     private final ResourceUserInteractRecordRepository resourceUserInteractRecordRepository;
 
-    private final IEventPublisher eventPublisher;
+    private final IResourceEventPublisher eventPublisher;
     private final MongoTemplate mongoTemplate;
 
     private final IGroupResService groupResService;

@@ -27,9 +27,10 @@ public class NoteSnapshotConsumer {
             }
     )
     public void onSnapshot(String payload) throws JsonProcessingException {
+        // 从非Java微服务（NodeJS）的发布者订阅，使用objectMapper显式转换
         NoteSnapshotMessage msg = objectMapper.readValue(payload, NoteSnapshotMessage.class);
-        log.info("接收到 Note 快照（事件） ResourceId={} | Version={} | Type={}", msg.getResourceId(), msg.getVersion(), msg.getType());
+        log.info("接收到 Note 快照（事件） resourceId={} version={} type={}", msg.getResourceId(), msg.getVersion(), msg.getType());
         noteVersionService.createVersion(msg);
-        log.info("已处理 Note 快照（事件） ResourceId={} | Version={} | Type={}", msg.getResourceId(), msg.getVersion(), msg.getType());
+        log.info("已处理 Note 快照（事件） resourceId={} version={} type={}", msg.getResourceId(), msg.getVersion(), msg.getType());
     }
 }

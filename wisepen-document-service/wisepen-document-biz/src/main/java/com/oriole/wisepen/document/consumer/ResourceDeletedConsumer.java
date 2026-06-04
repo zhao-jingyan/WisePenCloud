@@ -22,10 +22,7 @@ public class ResourceDeletedConsumer {
 
     private final IDocumentService documentService;
 
-    @KafkaListener(
-            topics = TOPIC_RESOURCE_PHYSICAL_DESTROY,
-            groupId = "wisepen-resource-physical-destroy-group"
-    )
+    @KafkaListener(topics = TOPIC_RESOURCE_PHYSICAL_DESTROY, groupId = "wisepen-resource-physical-destroy-group")
     public void onResourceDeleted(ResourceDeletedMessage message) {
         Map<ResourceType, List<String>> typedMap = message.getTypedResourceIds();
         List<String> documentIds = new ArrayList<>();
@@ -36,9 +33,9 @@ public class ResourceDeletedConsumer {
             }
         }
         if (!documentIds.isEmpty()) {
-            log.info("接收到 Document 资源硬删除事件 ResourceIds={}", documentIds);
+            log.info("接收到 Document 资源硬删除事件 resourceIds={}", documentIds);
             documentService.deleteDocuments(documentIds);
-            log.info("已处理 Document 资源硬删除事件 ResourceIds={}", documentIds);
+            log.info("已处理 Document 资源硬删除事件 resourceIds={}", documentIds);
         }
     }
 }

@@ -1,4 +1,4 @@
-package com.oriole.wisepen.resource.mq;
+package com.oriole.wisepen.resource.consumer;
 
 import com.oriole.wisepen.resource.domain.mq.AclRecalculateMessage;
 import com.oriole.wisepen.resource.enums.UpsertField;

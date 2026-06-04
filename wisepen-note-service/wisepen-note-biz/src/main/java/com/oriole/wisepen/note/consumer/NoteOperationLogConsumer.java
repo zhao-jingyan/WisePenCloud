@@ -27,9 +27,10 @@ public class NoteOperationLogConsumer {
             }
     )
     public void onOperationLog(String payload) throws JsonProcessingException {
+        // 从非Java微服务（NodeJS）的发布者订阅，使用objectMapper显式转换
         NoteOperationLogMessage msg = objectMapper.readValue(payload, NoteOperationLogMessage.class);
-        log.debug("接收到 Note 操作日志（事件） ResourceId={} | Count={}", msg.getResourceId(), msg.getEntries().size());
+        log.debug("接收到 Note 操作日志 resourceId={} count={}", msg.getResourceId(), msg.getEntries().size());
         noteOperationLogService.batchSave(msg);
-        log.debug("已处理 Note 操作日志（事件） ResourceId={} | Count={}", msg.getResourceId(), msg.getEntries().size());
+        log.debug("已处理 Note 操作日志 resourceId={} count={}", msg.getResourceId(), msg.getEntries().size());
     }
 }

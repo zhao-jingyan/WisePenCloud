@@ -20,7 +20,7 @@ import static com.oriole.wisepen.resource.constant.MqTopicConstants.TOPIC_ACL_RE
 @Slf4j
 @Component // 或者 @Service
 @RequiredArgsConstructor
-public class KafkaEventPublisherImpl implements IEventPublisher {
+public class KafkaResourceEventPublisherImpl implements IResourceEventPublisher {
 
     @Resource
     ReliablePublisher reliablePublisher;

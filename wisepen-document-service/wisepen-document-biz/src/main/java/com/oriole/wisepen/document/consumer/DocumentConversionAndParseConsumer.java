@@ -2,6 +2,7 @@ package com.oriole.wisepen.document.consumer;
 
 import cn.hutool.core.util.StrUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.oriole.wisepen.common.core.exception.ServiceException;
 import com.oriole.wisepen.document.api.constant.DocumentConstants;
 import com.oriole.wisepen.document.api.domain.base.DocumentStatus;
 import com.oriole.wisepen.document.api.domain.mq.DocumentParseTaskMessage;
@@ -9,6 +10,7 @@ import com.oriole.wisepen.document.api.enums.DocumentStatusEnum;
 import com.oriole.wisepen.document.config.DocumentProperties;
 import com.oriole.wisepen.document.domain.entity.DocumentContentEntity;
 import com.oriole.wisepen.document.domain.entity.DocumentPdfMetaEntity;
+import com.oriole.wisepen.document.exception.DocumentError;
 import com.oriole.wisepen.document.service.IDocumentFileService;
 import com.oriole.wisepen.document.service.IDocumentService;
 import com.oriole.wisepen.document.util.WatermarkPreProcessor;
@@ -33,22 +35,6 @@ import java.nio.file.Paths;
 
 import static com.oriole.wisepen.document.api.constant.MqTopicConstants.TOPIC_DOCUMENT_PARSE;
 
-/**
- * （Stage 3）文档解析
- * <p>
- * 消费 {@code wisepen-document-parse-topic} ，执行以下步骤：
- * <ol>
- *   <li>将文档状态推进至 {@code CONVERTING_AND_PARSING}</li>
- *   <li>获取内网下载 URL，将源文件下载到本地临时目录</li>
- *   <li>Office 文件经转换为 PDF；PDF 文件直接使用</li>
- *   <li>使用 PDFBox PDFTextStripper 从 PDF 中提取纯文本内容</li>
- *   <li>向 storage 申请新的预签名直传 URL，后端自身将 PDF 上传至 OSS</li>
- *   <li>同步相关信息到库，并结束文档解析阶段</li>
- * </ol>
- * 任意步骤抛出异常时，文档状态回落为 {@code FAILED}，错误摘要写入 errorMessage 字段，
- * 并清理所有本地临时文件。
- * </p>
- */
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -64,13 +50,10 @@ public class DocumentConversionAndParseConsumer {
     private final IDocumentService documentService;
 
     private final DocumentProperties documentProperties;
-    private final ObjectMapper objectMapper;
     private final WatermarkPreProcessor watermarkPreProcessor;
 
     @KafkaListener(topics = TOPIC_DOCUMENT_PARSE, groupId = "wisepen-document-parse-group")
-    public void onDocumentParse(String payload) throws IOException, InterruptedException {
-        DocumentParseTaskMessage msg = objectMapper.readValue(payload, DocumentParseTaskMessage.class);
-
+    public void onDocumentParse(DocumentParseTaskMessage msg) {
         try {
             process(msg);
         } catch (Exception e) {
@@ -140,26 +123,31 @@ public class DocumentConversionAndParseConsumer {
 
     /** 向 storage 服务申请 PDF 预览文件的预签名直传 URL，然后通过 HTTP PUT 将 PDF 上传至 OSS */
     private String uploadPreviewPdf(String documentId, File pdfFile) throws IOException, InterruptedException {
-        UploadInitRespDTO storageData = remoteStorageService.initUpload(
-                UploadInitReqDTO.builder()
-                        .extension("pdf")
-                        .scene(StorageSceneEnum.PRIVATE_DOC)
-                        .bizTag(documentId)
-                        .build()
-        ).getData();
+        UploadInitRespDTO uploadInitRespDTO;
+        try {
+            uploadInitRespDTO = remoteStorageService.initUpload(UploadInitReqDTO.builder()
+                    .extension("pdf")
+                    .scene(StorageSceneEnum.PRIVATE_DOC)
+                    .bizTag(documentId)
+                    .build()).getData();
+        }
+        catch (Exception e) {
+            log.warn("存储服务申请上传 URL 失败", e);
+            throw new ServiceException(DocumentError.DOCUMENT_UPLOAD_URL_APPLY_FAILED, e.getMessage());
+        }
 
         HttpRequest.Builder reqBuilder = HttpRequest.newBuilder()
-                .uri(URI.create(storageData.getPutUrl()))
+                .uri(URI.create(uploadInitRespDTO.getPutUrl()))
                 .header("Content-Type", "application/octet-stream")
                 .PUT(HttpRequest.BodyPublishers.ofFile(pdfFile.toPath()));
-        if (StrUtil.isNotBlank(storageData.getCallbackHeader())) {
-            reqBuilder.header("x-oss-callback", storageData.getCallbackHeader());
+        if (StrUtil.isNotBlank(uploadInitRespDTO.getCallbackHeader())) {
+            reqBuilder.header("x-oss-callback", uploadInitRespDTO.getCallbackHeader());
         }
         HttpResponse<Void> resp = HTTP_CLIENT.send(reqBuilder.build(), HttpResponse.BodyHandlers.discarding());
         if (resp.statusCode() / 100 != 2) {
             throw new IllegalStateException("PDF 上传至 OSS 失败 StatusCode=" + resp.statusCode());
         }
-        return storageData.getObjectKey();
+        return uploadInitRespDTO.getObjectKey();
     }
 
     /** 在缓存目录下创建临时文件（用于存放 Office→PDF 转换产物） */

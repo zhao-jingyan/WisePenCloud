@@ -10,7 +10,7 @@ import com.oriole.wisepen.resource.enums.ResourceAction;
 import com.oriole.wisepen.resource.exception.ResourceError;
 import com.oriole.wisepen.resource.repository.GroupResConfigRepository;
 import com.oriole.wisepen.resource.repository.ResourceItemRepository;
-import com.oriole.wisepen.resource.mq.IEventPublisher;
+import com.oriole.wisepen.resource.mq.IResourceEventPublisher;
 import com.oriole.wisepen.resource.service.IGroupResService;
 
 import lombok.RequiredArgsConstructor;
@@ -34,7 +34,7 @@ public class GroupResServiceImpl implements IGroupResService {
 
     private final GroupResConfigRepository groupResConfigRepository;
     private final ResourceItemRepository resourceItemRepository;
-    private final IEventPublisher aclEventPublisher;
+    private final IResourceEventPublisher aclEventPublisher;
     private final MongoTemplate mongoTemplate;
 
     @Override

@@ -9,6 +9,7 @@ import org.springframework.kafka.core.KafkaTemplate;
 
 import java.util.Map;
 import java.util.Objects;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 import static com.oriole.wisepen.common.mq.MqConstants.BACKLOG_KEY_PREFIX;
@@ -26,19 +27,23 @@ public class RedisBackloggedPublisher implements ReliablePublisher {
 
     @Override
     public CompletableFuture<Void> publish(String topic, String kafkaKey, Object payload, String dedupKey) {
+
+        if (dedupKey == null) dedupKey = kafkaKey != null ? kafkaKey : UUID.randomUUID().toString();
+
         drainBacklogAsync(topic); // 每次发新消息前，先异步尝试补发这个 topic 之前失败积压的消息
 
         CompletableFuture<Void> result = new CompletableFuture<>();
         try {
             // 发送当前消息
-            kafkaTemplate.send(topic, kafkaKey, payload).whenComplete((sendResult, ex) -> {
+            String finalDedupKey = dedupKey;
+            kafkaTemplate.send(topic, finalDedupKey, payload).whenComplete((sendResult, ex) -> {
                 if (ex == null) {
-                    log.debug("message published topic={} key={} dedupKey={}", topic, kafkaKey, dedupKey);
+                    log.debug("message published topic={} key={} dedupKey={}", topic, kafkaKey, finalDedupKey);
                     result.complete(null);
                     return;
                 }
                 // 如果 Kafka 异步回调里失败
-                enqueueBacklog(topic, kafkaKey, payload, dedupKey, ex);
+                enqueueBacklog(topic, kafkaKey, payload, finalDedupKey, ex);
                 result.completeExceptionally(ex);
             });
         } catch (Exception e) { // 如果 kafkaTemplate.send(...) 本身直接抛异常

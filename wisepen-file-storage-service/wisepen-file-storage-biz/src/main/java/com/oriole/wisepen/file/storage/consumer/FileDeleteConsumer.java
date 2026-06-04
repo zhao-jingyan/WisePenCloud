@@ -22,11 +22,9 @@ public class FileDeleteConsumer {
     private final IStorageService storageService;
     private final ObjectMapper objectMapper;
 
-    @KafkaListener(
-            topics = TOPIC_FILE_DELETE,
-            groupId = "wisepen-storage-file-delete-group"
-    )
+    @KafkaListener(topics = TOPIC_FILE_DELETE, groupId = "wisepen-storage-file-delete-group")
     public void onObjectDeleted(String payload) throws JsonProcessingException {
+        // 可能从非Java微服务订阅，使用objectMapper显式转换
         List<String> objectKeys = objectMapper.readValue(payload, new TypeReference<List<String>>() {});
         log.debug("接收到 Object 删除事件 objectKeys={}", objectKeys);
         storageService.deleteFiles(objectKeys);

@@ -21,19 +21,6 @@ import java.util.List;
 
 import static com.oriole.wisepen.file.storage.api.constant.MqTopicConstants.TOPIC_FILE_UPLOADED;
 
-/**
- * （Stage 2）文档已上传
- * <p>
- * 消费 {@code FileUploadedMessage}，执行以下步骤：
- * <ol>
- *   <li>按 {@code objectKey} 查找对应的 {@code DocumentInfoEntity}</li>
- *   <li>状态守卫：仅处理 UPLOADING / UPLOADED 状态，幂等跳过其他状态</li>
- *   <li>用 OSS 回传的真实 size 覆盖上传元数据</li>
- *   <li>推进文档状态至 UPLOADED</li>
- *   <li>派发 {@link DocumentParseTaskMessage} 到解析队列，触发 Stage 3</li>
- * </ol>
- * </p>
- */
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -46,6 +33,7 @@ public class FileUploadedConsumer {
 
     @KafkaListener(topics = TOPIC_FILE_UPLOADED, groupId = "wisepen-document-upload-callback-group")
     public void onFileUploaded(String payload) throws JsonProcessingException {
+        // 从兼容非Java微服务的发布者订阅，使用objectMapper显式转换
         FileUploadedMessage msg = objectMapper.readValue(payload, FileUploadedMessage.class);
         process(msg);
     }
@@ -59,12 +47,12 @@ public class FileUploadedConsumer {
         if (entity == null) {
             // 用户已经取消文件处理，删除文档
             eventPublisher.publishFileDeleteEvent(List.of(msg.getObjectKey()));
-            log.warn("未找到对应文档，已经删除上传的文件 ObjectKey={}", msg.getObjectKey());
+            log.warn("未找到对应文档，已经删除上传的文件 objectKey={}", msg.getObjectKey());
             return;
         }
 
         if (DocumentStatusEnum.UPLOADING != entity.getDocumentStatus().getStatus()) {
-            log.debug("文档已处理, 跳过 DocumentId={} | Status={}", entity.getDocumentId(), entity.getDocumentStatus().getStatus());
+            log.debug("文档已处理, 跳过 documentId={} status={}", entity.getDocumentId(), entity.getDocumentStatus().getStatus());
             return;
         }
 
@@ -81,6 +69,6 @@ public class FileUploadedConsumer {
                         .fileType(entity.getUploadMeta().getFileType())
                         .build()
         );
-        log.info("文档上传回调处理完成 DocumentId={}", entity.getDocumentId());
+        log.info("文档上传回调处理完成 documentId={}", entity.getDocumentId());
     }
 }
