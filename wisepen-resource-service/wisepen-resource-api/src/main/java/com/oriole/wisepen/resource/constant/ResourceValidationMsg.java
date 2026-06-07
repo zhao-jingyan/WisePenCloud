@@ -34,4 +34,5 @@ public interface ResourceValidationMsg {
     String MARKET_PRICE_INVALID = "价格必须大于0";
     String MARKET_VERSION_NOT_NULL = "上架版本不能为空";
     String MARKET_VERSION_INVALID = "上架版本不能小于0";
+    String MARKET_SELL_METHOD_NOT_NULL = "售卖方式不能为空";
 }

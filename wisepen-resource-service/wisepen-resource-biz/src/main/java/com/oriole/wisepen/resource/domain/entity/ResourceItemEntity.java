@@ -2,6 +2,7 @@ package com.oriole.wisepen.resource.domain.entity;
 
 import com.oriole.wisepen.resource.domain.ComputedGroupAcl;
 import com.oriole.wisepen.resource.domain.GroupTagBind;
+import com.oriole.wisepen.resource.domain.ListingInfo;
 import com.oriole.wisepen.resource.domain.base.ResourceItemInfoBase;
 import lombok.*;
 import org.springframework.data.annotation.CreatedDate;
@@ -39,4 +40,7 @@ public class ResourceItemEntity extends ResourceItemInfoBase {
 
     /** 资源删除时间，非 null 表示已删除；定时任务据此判断是否到期硬删*/
     private LocalDateTime deletedAt;
+
+    /** 集市上架记录列表；空列表表示从未上架。每条对应一种售卖方式 + 上架版本组合 */
+    private List<ListingInfo> listingInfos = new ArrayList<>();
 }

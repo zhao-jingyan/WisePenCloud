@@ -4,10 +4,10 @@ import cn.hutool.core.bean.BeanUtil;
 import com.oriole.wisepen.common.core.domain.PageR;
 import com.oriole.wisepen.common.core.domain.enums.GroupRoleType;
 import com.oriole.wisepen.common.core.domain.enums.GroupType;
-import com.oriole.wisepen.common.core.domain.enums.list.SortDirectionEnum;
 import com.oriole.wisepen.common.core.exception.ServiceException;
 import com.oriole.wisepen.document.api.feign.RemoteDocumentService;
 import com.oriole.wisepen.note.api.feign.RemoteNoteService;
+import com.oriole.wisepen.resource.domain.ListingInfo;
 import com.oriole.wisepen.resource.domain.dto.ResourceCheckPermissionReqDTO;
 import com.oriole.wisepen.resource.domain.dto.ResourceCheckPermissionResDTO;
 import com.oriole.wisepen.resource.domain.dto.ResourceCreateReqDTO;
@@ -15,7 +15,6 @@ import com.oriole.wisepen.resource.domain.dto.req.MarketForkRequest;
 import com.oriole.wisepen.resource.domain.dto.req.MarketListResourceRequest;
 import com.oriole.wisepen.resource.domain.dto.req.MarketOffShelfRequest;
 import com.oriole.wisepen.resource.domain.dto.req.MarketPurchaseRequest;
-import com.oriole.wisepen.resource.domain.dto.req.MarketUpdateListingVersionRequest;
 import com.oriole.wisepen.resource.domain.dto.req.ResourceForkRequest;
 import com.oriole.wisepen.resource.domain.dto.res.MarketListingResponse;
 import com.oriole.wisepen.resource.domain.dto.res.MarketPurchaseResponse;
@@ -24,8 +23,9 @@ import com.oriole.wisepen.resource.domain.entity.MarketPurchaseEntity;
 import com.oriole.wisepen.resource.domain.entity.ResourceInteractionInfoEntity;
 import com.oriole.wisepen.resource.domain.entity.ResourceItemEntity;
 import com.oriole.wisepen.resource.domain.entity.TagEntity;
-import com.oriole.wisepen.resource.enums.MarketListingSortBy;
+import com.oriole.wisepen.resource.enums.MarketListingAuditStatus;
 import com.oriole.wisepen.resource.enums.MarketListingStatus;
+import com.oriole.wisepen.resource.enums.MarketSellMethod;
 import com.oriole.wisepen.resource.enums.ResourceAccessRole;
 import com.oriole.wisepen.resource.enums.ResourceAction;
 import com.oriole.wisepen.resource.enums.ResourceType;
@@ -47,24 +47,19 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
-import org.springframework.data.mongodb.core.MongoTemplate;
-import org.springframework.data.mongodb.core.aggregation.Aggregation;
-import org.springframework.data.mongodb.core.aggregation.AggregationOperation;
-import org.springframework.data.mongodb.core.query.Criteria;
-import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
+import java.time.LocalDateTime;
 
 @Slf4j
 @Service
@@ -76,7 +71,6 @@ public class MarketServiceImpl implements IMarketService {
     private final ResourceInteractionInfoRepository resourceInteractionInfoRepository;
     private final ResourceItemRepository resourceItemRepository;
     private final TagRepository tagRepository;
-    private final MongoTemplate mongoTemplate;
     private final IResourceService resourceService;
     private final RemoteUserService remoteUserService;
     private final RemoteWalletService remoteWalletService;
@@ -84,7 +78,7 @@ public class MarketServiceImpl implements IMarketService {
     private final RemoteDocumentService remoteDocumentService;
 
     @Override
-    public MarketListingResponse listResource(MarketListResourceRequest request, Long sellerId, Map<Long, GroupRoleType> groupRoles) {
+    public MarketListingResponse addListing(MarketListResourceRequest request, Long sellerId, Map<Long, GroupRoleType> groupRoles) {
         // 检验是否为资源拥有者
         String sellerIdStr = sellerId.toString();
         resourceService.assertResourceOwner(request.getResourceId(), sellerIdStr);
@@ -114,14 +108,14 @@ public class MarketServiceImpl implements IMarketService {
 
         // 检验上架 Version
         Long listedVersion = request.getListedVersion();
+        MarketSellMethod sellMethod = request.getSellMethod();
         // TODO: 文档版本管理
         if (resource.getResourceType() != ResourceType.NOTE && listedVersion != 0L) {
             throw new ServiceException(ResourceError.MARKET_VERSION_NOT_SUPPORTED);
         }
 
-        // 检验是否已上架
-        MarketListingEntity entity = marketListingRepository.findByMarketGroupIdAndSourceResourceId(request.getMarketGroupId(), request.getResourceId());
-        if (entity != null && entity.getStatus() == MarketListingStatus.LISTED) {
+        ListingInfo existing = findListingInfo(resource, sellMethod, listedVersion);
+        if (existing != null && existing.getStatus() == MarketListingStatus.LISTED) {
             throw new ServiceException(ResourceError.MARKET_LISTING_ALREADY_EXISTS);
         }
 
@@ -132,93 +126,64 @@ public class MarketServiceImpl implements IMarketService {
                 marketRole,
                 request.getTagIds()
         );
-        if (entity != null) {
-            entity.setStatus(MarketListingStatus.LISTED);
-            entity.setRevision(entity.getRevision() == null ? 1 : entity.getRevision() + 1);
-        } else {
-            entity = MarketListingEntity.builder()
-                    .sourceResourceId(resource.getResourceId())
-                    .sellerId(sellerIdStr)
-                    .marketGroupId(request.getMarketGroupId())
-                    .tagIds(request.getTagIds())
-                    .price(request.getPrice())
-                    .listedVersion(listedVersion)
-                    .status(MarketListingStatus.LISTED)
-                    .revision(1)
-                    .resourceName(resource.getResourceName())
-                    .resourceType(resource.getResourceType())
-                    .preview(resource.getPreview())
-                    .size(resource.getSize())
-                    .build();
-        }
-        MarketListingEntity saved = marketListingRepository.save(entity);
-        log.info("market listing saved listingId={} sourceResourceId={} sellerId={} marketGroupId={} revision={}",
-                saved.getListingId(), saved.getSourceResourceId(), sellerIdStr, saved.getMarketGroupId(), saved.getRevision());
 
-        MarketListingResponse response = BeanUtil.copyProperties(saved, MarketListingResponse.class);
-        Map<String, String> tagMap = new HashMap<>();
-        if (saved.getTagIds() != null && !saved.getTagIds().isEmpty()) {
-            tagRepository.findAllById(saved.getTagIds()).forEach(tag -> tagMap.put(tag.getTagId(), tag.getTagName()));
+        LocalDateTime now = LocalDateTime.now();
+
+        ListingInfo listing;
+        if (existing != null) {
+            listing = existing;
+            listing.setRevision(existing.getRevision() == null ? 1 : existing.getRevision() + 1);
+        } else {
+            if (resource.getListingInfos() == null) {
+                resource.setListingInfos(new ArrayList<>());
+            }
+            listing = ListingInfo.builder()
+                    .listingId(UUID.randomUUID().toString())
+                    .sellMethod(sellMethod)
+                    .listedVersion(listedVersion)
+                    .revision(1)
+                    .build();
+            resource.getListingInfos().add(listing);
         }
-        response.setCurrentTags(tagMap);
-        ResourceInteractionInfoEntity interactionInfo = resourceInteractionInfoRepository.findById(saved.getSourceResourceId())
+
+        listing.setPrice(request.getPrice());
+        listing.setStatus(MarketListingStatus.LISTED);
+        listing.setSellerId(sellerIdStr);
+        listing.setListedAt(now);
+        listing.setOffShelfAt(null);
+        listing.setAuditStatus(MarketListingAuditStatus.PENDING);
+        resourceItemRepository.save(resource);
+        log.info("market listing saved listingId={} resourceId={} sellerId={} marketGroupId={} revision={}",
+                listing.getListingId(), resource.getResourceId(), sellerIdStr, request.getMarketGroupId(), listing.getRevision());
+
+        MarketListingResponse response = BeanUtil.copyProperties(resource, MarketListingResponse.class);
+        BeanUtil.copyProperties(listing, response);
+        response.setSourceResourceId(resource.getResourceId());
+        response.setMarketGroupId(request.getMarketGroupId());
+        response.setTagIds(request.getTagIds());
+        response.setCurrentTags(tags.stream().collect(Collectors.toMap(TagEntity::getTagId, TagEntity::getTagName)));
+        ResourceInteractionInfoEntity interactionInfo = resourceInteractionInfoRepository.findById(resource.getResourceId())
                 .orElseGet(ResourceInteractionInfoEntity::new);
         response.setResourceInteractionInfo(interactionInfo);
-        UserDisplayBase sellerInfo;
         try {
-            Long seller = Long.valueOf(saved.getSellerId());
-            sellerInfo = remoteUserService.getUserDisplayInfo(List.of(seller)).getData().get(seller);
+            Long seller = Long.valueOf(listing.getSellerId());
+            response.setSellerInfo(remoteUserService.getUserDisplayInfo(List.of(seller)).getData().get(seller));
         } catch (Exception e) {
-            // Feign 调用失败
-            log.debug("market seller info degraded sellerId={}", saved.getSellerId(), e);
-            sellerInfo = new UserDisplayBase("UNKNOW", null, null, null);
+            log.debug("market seller info degraded sellerId={}", listing.getSellerId(), e);
+            response.setSellerInfo(new UserDisplayBase("UNKNOW", null, null, null));
         }
-        response.setSellerInfo(sellerInfo);
         return response;
     }
 
-    @Override
-    public MarketListingResponse updateListingVersion(MarketUpdateListingVersionRequest request, Long sellerId) {
-        MarketListingEntity entity = marketListingRepository.findById(request.getListingId())
-                .orElseThrow(() -> new ServiceException(ResourceError.MARKET_LISTING_NOT_FOUND));
-        if (!sellerId.toString().equals(entity.getSellerId())) {
-            throw new ServiceException(ResourceError.RESOURCE_PERMISSION_DENIED);
+    private ListingInfo findListingInfo(ResourceItemEntity resource, MarketSellMethod sellMethod, Long listedVersion) {
+        if (resource.getListingInfos() == null || resource.getListingInfos().isEmpty()) {
+            return null;
         }
-        ResourceItemEntity resource = resourceItemRepository.findById(entity.getSourceResourceId())
-                .orElseThrow(() -> new ServiceException(ResourceError.RESOURCE_NOT_FOUND));
-
-        Long newVersion = request.getListedVersion() == null ? 0L : request.getListedVersion();
-        // TODO: 文档版本管理（目前只支持Note版本，其余默认0）
-        if (resource.getResourceType() != ResourceType.NOTE && newVersion != 0L) {
-            throw new ServiceException(ResourceError.MARKET_VERSION_NOT_SUPPORTED);
-        }
-
-        if (!Objects.equals(entity.getListedVersion(), newVersion)) {
-            entity.setListedVersion(newVersion);
-            entity.setRevision(entity.getRevision() == null ? 1 : entity.getRevision() + 1);
-            marketListingRepository.save(entity);
-        }
-
-        MarketListingResponse response = BeanUtil.copyProperties(entity, MarketListingResponse.class);
-        Map<String, String> tagMap = new HashMap<>();
-        if (entity.getTagIds() != null && !entity.getTagIds().isEmpty()) {
-            tagRepository.findAllById(entity.getTagIds()).forEach(tag -> tagMap.put(tag.getTagId(), tag.getTagName()));
-        }
-        response.setCurrentTags(tagMap);
-        ResourceInteractionInfoEntity interactionInfo = resourceInteractionInfoRepository.findById(entity.getSourceResourceId())
-                .orElseGet(ResourceInteractionInfoEntity::new);
-        response.setResourceInteractionInfo(interactionInfo);
-        UserDisplayBase sellerInfo;
-        try {
-            Long seller = Long.valueOf(entity.getSellerId());
-            sellerInfo = remoteUserService.getUserDisplayInfo(List.of(seller)).getData().get(seller);
-        } catch (Exception e) {
-            // Feign 调用失败
-            log.debug("market seller info degraded sellerId={}", entity.getSellerId(), e);
-            sellerInfo = new UserDisplayBase("UNKNOW", null, null, null);
-        }
-        response.setSellerInfo(sellerInfo);
-        return response;
+        return resource.getListingInfos().stream()
+                .filter(info -> info.getSellMethod() == sellMethod
+                        && Objects.equals(info.getListedVersion(), listedVersion))
+                .findFirst()
+                .orElse(null);
     }
 
     @Override
@@ -279,25 +244,19 @@ public class MarketServiceImpl implements IMarketService {
             return BeanUtil.copyProperties(existing, MarketPurchaseResponse.class);
         }
 
-        remoteWalletService.settleCoinTrade(WalletSettleCoinTradeRequest.builder()
-                .traceId(traceId)
-                .buyerId(buyerId)
-                .sellerId(Long.valueOf(listing.getSellerId()))
-                .price(listing.getPrice())
-                .meta("market listing " + listing.getListingId())
-                .build());
+        WalletSettleCoinTradeRequest tradeRequest = BeanUtil.copyProperties(listing, WalletSettleCoinTradeRequest.class);
+        tradeRequest.setTraceId(traceId);
+        tradeRequest.setBuyerId(buyerId);
+        tradeRequest.setSellerId(Long.valueOf(listing.getSellerId()));
+        tradeRequest.setMeta("market listing " + listing.getListingId());
+        remoteWalletService.settleCoinTrade(tradeRequest);
 
-        MarketPurchaseEntity purchase = MarketPurchaseEntity.builder()
-                .listingId(listing.getListingId())
-                .buyerId(buyerId.toString())
-                .sellerId(listing.getSellerId())
-                .sourceResourceId(listing.getSourceResourceId())
-                .paidPrice(listing.getPrice())
-                .forkedVersion(listing.getListedVersion() == null ? 0L : listing.getListedVersion())
-                .listingRevision(listing.getRevision())
-                .tradeTraceId(traceId)
-                .resourceType(listing.getResourceType())
-                .build();
+        MarketPurchaseEntity purchase = BeanUtil.copyProperties(listing, MarketPurchaseEntity.class);
+        purchase.setBuyerId(buyerId.toString());
+        purchase.setPaidPrice(listing.getPrice());
+        purchase.setForkedVersion(listing.getListedVersion() == null ? 0L : listing.getListedVersion());
+        purchase.setListingRevision(listing.getRevision());
+        purchase.setTradeTraceId(traceId);
         MarketPurchaseEntity saved = marketPurchaseRepository.save(purchase);
         log.info("market purchase saved purchaseId={} listingId={} buyerId={} revision={}",
                 saved.getPurchaseId(), listing.getListingId(), buyerId, listing.getRevision());
@@ -317,14 +276,10 @@ public class MarketServiceImpl implements IMarketService {
 
         ResourceItemEntity source = resourceItemRepository.findById(purchase.getSourceResourceId())
                 .orElseThrow(() -> new ServiceException(ResourceError.RESOURCE_NOT_FOUND));
-        String forkedResourceId = resourceService.createResourceItem(ResourceCreateReqDTO.builder()
-                .resourceName(source.getResourceName())
-                .resourceType(source.getResourceType())
-                .ownerId(buyerId.toString())
-                .pathTagId(request.getPathTagId())
-                .preview(source.getPreview())
-                .size(source.getSize())
-                .build());
+        ResourceCreateReqDTO createReq = BeanUtil.copyProperties(source, ResourceCreateReqDTO.class);
+        createReq.setOwnerId(buyerId.toString());
+        createReq.setPathTagId(request.getPathTagId());
+        String forkedResourceId = resourceService.createResourceItem(createReq);
 
         try {
             Long forkedVersion = purchase.getForkedVersion() == null ? 0L : purchase.getForkedVersion();
@@ -352,114 +307,6 @@ public class MarketServiceImpl implements IMarketService {
             log.warn("market fork compensated purchaseId={} forkedResourceId={}", purchase.getPurchaseId(), forkedResourceId, e);
             throw e;
         }
-    }
-
-    @Override
-    public PageR<MarketListingResponse> listMarketListings(String marketGroupId, List<String> tagIds, int page, int size,
-                                                           MarketListingSortBy sortBy, SortDirectionEnum sortDir) {
-        // 检验是否为集市组
-        Long marketGroupIdLong = Long.valueOf(marketGroupId);
-        Map<Long, GroupDisplayBase> groupMap = remoteUserService.getGroupDisplayInfo(List.of(marketGroupIdLong)).getData();
-        GroupDisplayBase groupInfo = groupMap == null ? null : groupMap.get(marketGroupIdLong);
-        if (groupInfo == null || groupInfo.getGroupType() != GroupType.MARKET_GROUP) {
-            throw new ServiceException(ResourceError.MARKET_GROUP_REQUIRED);
-        }
-
-        List<MarketListingEntity> listings;
-        long total;
-        Sort sort = Sort.by(sortDir.toSpringDirection(), sortBy.getDbField());
-        // 排序：点赞、时间……
-        if (sortBy.isInteractionField()) {
-            Criteria criteria = Criteria.where("marketGroupId").is(marketGroupId)
-                    .and("status").is(MarketListingStatus.LISTED);
-            if (tagIds != null && !tagIds.isEmpty()) {
-                criteria.and("tagIds").in(tagIds);
-            }
-            List<AggregationOperation> operations = new ArrayList<>();
-            operations.add(Aggregation.match(criteria));
-            operations.add(Aggregation.lookup(
-                    "wisepen_resource_interact_info",
-                    "sourceResourceId",
-                    "resourceId",
-                    "resourceInteractionInfo"
-            ));
-            operations.add(Aggregation.unwind("resourceInteractionInfo", true));
-            operations.add(Aggregation.sort(sort));
-            operations.add(Aggregation.skip((long) Math.max(page - 1, 0) * size));
-            operations.add(Aggregation.limit(size));
-            listings = mongoTemplate.aggregate(
-                    Aggregation.newAggregation(operations),
-                    "wisepen_market_listings",
-                    MarketListingEntity.class
-            ).getMappedResults();
-            total = mongoTemplate.count(Query.query(criteria), MarketListingEntity.class);
-        } else {
-            Pageable pageable = PageRequest.of(Math.max(page - 1, 0), size, sort);
-            Page<MarketListingEntity> entityPage = tagIds == null || tagIds.isEmpty()
-                    ? marketListingRepository.findByMarketGroupIdAndStatus(marketGroupId, MarketListingStatus.LISTED, pageable)
-                    : marketListingRepository.findByMarketGroupIdAndStatusAndTagIdsIn(
-                    marketGroupId, MarketListingStatus.LISTED, tagIds, pageable);
-            listings = entityPage.getContent();
-            total = entityPage.getTotalElements();
-        }
-
-        Set<String> allTagIds = new HashSet<>();
-        Set<Long> sellerIds = new HashSet<>();
-        List<String> sourceResourceIds = listings.stream()
-                .map(MarketListingEntity::getSourceResourceId)
-                .toList();
-        listings.forEach(entity -> {
-            if (entity.getTagIds() != null) {
-                allTagIds.addAll(entity.getTagIds());
-            }
-            try {
-                sellerIds.add(Long.valueOf(entity.getSellerId()));
-            } catch (NumberFormatException e) {
-                log.debug("market seller id invalid sellerId={}", entity.getSellerId(), e);
-            }
-        });
-
-        Map<String, ResourceInteractionInfoEntity> interactionMap = sourceResourceIds.isEmpty()
-                ? Collections.emptyMap()
-                : resourceInteractionInfoRepository.findByResourceIdIn(sourceResourceIds).stream()
-                .collect(Collectors.toMap(ResourceInteractionInfoEntity::getResourceId, entity -> entity));
-
-        Map<String, String> tagNameMap = new HashMap<>();
-        if (!allTagIds.isEmpty()) {
-            tagRepository.findAllById(allTagIds).forEach(tag -> tagNameMap.put(tag.getTagId(), tag.getTagName()));
-        }
-
-        Map<Long, UserDisplayBase> sellerInfoMap = Collections.emptyMap();
-        if (!sellerIds.isEmpty()) {
-            try {
-                Map<Long, UserDisplayBase> remoteMap = remoteUserService.getUserDisplayInfo(sellerIds.stream().toList()).getData();
-                sellerInfoMap = remoteMap == null ? Collections.emptyMap() : remoteMap;
-            } catch (Exception e) {
-                log.debug("market seller info degraded sellerIds={}", sellerIds, e);
-            }
-        }
-
-        Map<Long, UserDisplayBase> finalSellerInfoMap = sellerInfoMap;
-        PageR<MarketListingResponse> pageR = new PageR<>(total, page, size);
-        pageR.addAll(listings.stream()
-                .map(entity -> {
-                    MarketListingResponse response = BeanUtil.copyProperties(entity, MarketListingResponse.class);
-                    Map<String, String> tagMap = new HashMap<>();
-                    if (entity.getTagIds() != null) {
-                        entity.getTagIds().forEach(tagId -> tagMap.put(tagId, tagNameMap.get(tagId)));
-                    }
-                    response.setCurrentTags(tagMap);
-                    response.setResourceInteractionInfo(
-                            interactionMap.getOrDefault(entity.getSourceResourceId(), new ResourceInteractionInfoEntity()));
-                    try {
-                        response.setSellerInfo(finalSellerInfoMap.get(Long.valueOf(entity.getSellerId())));
-                    } catch (NumberFormatException e) {
-                        log.debug("market seller id invalid sellerId={}", entity.getSellerId(), e);
-                    }
-                    return response;
-                })
-                .toList());
-        return pageR;
     }
 
     @Override

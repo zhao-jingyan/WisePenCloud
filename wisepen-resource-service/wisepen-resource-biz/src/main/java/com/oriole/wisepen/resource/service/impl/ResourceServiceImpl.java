@@ -13,6 +13,7 @@ import com.oriole.wisepen.resource.domain.GroupTagBind;
 import com.oriole.wisepen.resource.domain.dto.*;
 import com.oriole.wisepen.resource.domain.dto.req.ResourceRenameRequest;
 import com.oriole.wisepen.resource.domain.dto.req.ResourceUpdateActionPermissionRequest;
+import com.oriole.wisepen.resource.domain.dto.res.ListingInfoResponse;
 import com.oriole.wisepen.resource.domain.dto.res.ResourceItemResponse;
 import com.oriole.wisepen.resource.domain.entity.GroupResConfigEntity;
 import com.oriole.wisepen.resource.domain.entity.ResourceItemEntity;
@@ -471,6 +472,17 @@ public class ResourceServiceImpl implements IResourceService {
             }
             resp.setCurrentTags(tagMap);
 
+            List<ListingInfoResponse> listingInfos = null;
+            if (entity.getListingInfos() != null && !entity.getListingInfos().isEmpty()) {
+                boolean isOwner = currentUserId.equals(entity.getOwnerId());
+                boolean isGroupAdmin = userGroupRole == GroupRoleType.ADMIN || userGroupRole == GroupRoleType.OWNER;
+                listingInfos = entity.getListingInfos().stream()
+                        .filter(info -> isOwner || isGroupAdmin || info.isMarketVisible())
+                        .map(info -> BeanUtil.copyProperties(info, ListingInfoResponse.class))
+                        .collect(Collectors.collectingAndThen(Collectors.toList(), list -> list.isEmpty() ? null : list));
+            }
+            resp.setListingInfos(listingInfos);
+
             return resp;
         }).collect(Collectors.toList());
 
@@ -490,7 +502,6 @@ public class ResourceServiceImpl implements IResourceService {
         pageR.addAll(responses);
         return pageR;
     }
-
 
     @Override
     public String createResourceItem(ResourceCreateReqDTO dto) {

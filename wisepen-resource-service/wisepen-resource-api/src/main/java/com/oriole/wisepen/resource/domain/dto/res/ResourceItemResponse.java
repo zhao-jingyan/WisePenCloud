@@ -23,4 +23,7 @@ public class ResourceItemResponse extends ResourceItemInfoBase {
 
     private List<ResourceAction> overrideGrantedActions;
     private Map<String, List<ResourceAction>> specifiedUsersGrantedActions;
+
+    /** 有上架记录时返回 listingInfos；无记录或未通过可见性过滤时为 null */
+    private List<ListingInfoResponse> listingInfos;
 }
