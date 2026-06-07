@@ -54,7 +54,7 @@ public class ResourceInteractionServiceImpl implements IResourceInteractionServi
         if (Boolean.TRUE.equals(isFirstReadInWindow)) {
             customResourceUserInteractionRecordRepository.findAndSetRead(resourceId, userId, true);
             customResourceInteractionInfoRepository.incrementReadCount(resourceId, 1);
-            log.info("readCount incremented resourceId={} userId={}", resourceId, userId);
+            log.debug("read count incremented. resourceId={} userId={}", resourceId, userId);
         }
     }
 
@@ -78,7 +78,7 @@ public class ResourceInteractionServiceImpl implements IResourceInteractionServi
         customResourceUserInteractionRecordRepository.findAndSetLiked(resourceId, userId, wantLiked);
         customResourceInteractionInfoRepository.incrementLikeCount(resourceId, wantLiked ? 1 : -1);
 
-        log.info("resource like toggled resourceId={} userId={} wantLiked={}", resourceId, userId, wantLiked);
+        log.debug("resource like changed. resourceId={} userId={} liked={}", resourceId, userId, wantLiked);
     }
 
     /**
@@ -102,6 +102,7 @@ public class ResourceInteractionServiceImpl implements IResourceInteractionServi
         } else if (!oldScore.equals(newScore)) { // 改分
             customResourceInteractionInfoRepository.updateScoreStats(resourceId, 0, newScore - oldScore);
         }
-        log.info("resource rated resourceId={} userId={} oldScore={} newScore={}", resourceId, userId, oldScore, newScore);
+        log.debug("resource rating changed. resourceId={} userId={} oldScore={} newScore={}",
+                resourceId, userId, oldScore, newScore);
     }
 }

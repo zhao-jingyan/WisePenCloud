@@ -54,7 +54,8 @@ public class AliyunOssProvider implements StorageProvider {
                 config.getAccessKeyId(),
                 config.getAccessKeySecret()
         );
-        log.info("Aliyun OSS Client initialized for ConfigId: [{}] - {}", config.getId(), config.getName());
+        log.info("aliyun oss client initialized. configId={} provider={} name={}",
+                config.getId(), config.getProvider(), config.getName());
     }
 
     @Override
@@ -99,7 +100,7 @@ public class AliyunOssProvider implements StorageProvider {
                     .build();
 
         } catch (JsonProcessingException e) {
-            log.error("构建 OSS 回调策略 JSON 失败", e);
+            log.error("aliyun oss callback policy build failed. objectKey={}", objectKey, e);
             throw new ServiceException(FileStorageError.STORAGE_PROVIDER_GENERATE_CALLBACK_POLICY_FAILED);
         }
     }
@@ -112,7 +113,7 @@ public class AliyunOssProvider implements StorageProvider {
             URL url = ossClient.generatePresignedUrl(config.getBucketName(), objectKey, expirationDate, HttpMethod.GET);
             return url.toString();
         } catch (Exception e) {
-            log.error("OSS Generate Presigned Url 失败: {}", objectKey, e);
+            log.error("aliyun oss download url generate failed. objectKey={}", objectKey, e);
             throw new ServiceException(FileStorageError.STORAGE_PROVIDER_GET_FILE_DOWNLOAD_URL_FAILED);
         }
     }
@@ -123,7 +124,8 @@ public class AliyunOssProvider implements StorageProvider {
             // 阿里云内部物理拷贝，实现极速秒传，不消耗服务器出入网带宽
             ossClient.copyObject(config.getBucketName(), sourceKey, config.getBucketName(), targetKey);
         } catch (Exception e) {
-            log.error("OSS CopyObject 失败: source={}, target={}", sourceKey, targetKey, e);
+            log.error("aliyun oss object copy failed. sourceObjectKey={} targetObjectKey={}",
+                    sourceKey, targetKey, e);
             throw new ServiceException(FileStorageError.STORAGE_PROVIDER_COPY_FILE_FAILED);
         }
     }
@@ -133,7 +135,7 @@ public class AliyunOssProvider implements StorageProvider {
         try {
             ossClient.deleteObject(config.getBucketName(), objectKey);
         } catch (Exception e) {
-            log.error("OSS DeleteObject 失败: {}", objectKey, e);
+            log.error("aliyun oss object delete failed. objectKey={}", objectKey, e);
             throw new ServiceException(FileStorageError.STORAGE_PROVIDER_DELETE_FILE_FAILED);
         }
     }
@@ -144,7 +146,7 @@ public class AliyunOssProvider implements StorageProvider {
             // 代理直传，适合图床等轻量级场景
             ossClient.putObject(config.getBucketName(), objectKey, inputStream);
         } catch (Exception e) {
-            log.error("OSS PutObject (SmallFile) 失败: {}", objectKey, e);
+            log.error("aliyun oss small file upload failed. objectKey={}", objectKey, e);
             throw new ServiceException(FileStorageError.STORAGE_PROVIDER_UPLOAD_FILE_FAILED);
         }
     }
@@ -192,7 +194,8 @@ public class AliyunOssProvider implements StorageProvider {
                     .build();
 
         } catch (Exception e) {
-            log.error("生成 STS Token 失败: pathPrefix={}, configId={}", pathPrefix, config.getId(), e);
+            log.error("aliyun sts token generate failed. pathPrefix={} configId={}",
+                    pathPrefix, config.getId(), e);
             throw new ServiceException(FileStorageError.STORAGE_PROVIDER_GENERATE_STS_TOKEN_FAILED);
         }
     }
@@ -243,7 +246,7 @@ public class AliyunOssProvider implements StorageProvider {
             return signature.verify(signBytes);
 
         } catch (Exception e) {
-            log.error("OSS 回调签名验证异常", e);
+            log.warn("aliyun oss callback signature rejected.", e);
             return false;
         }
     }
@@ -269,7 +272,7 @@ public class AliyunOssProvider implements StorageProvider {
             if ("NoSuchKey".equals(e.getErrorCode())) {
                 return null;
             }
-            log.error("查询 OSS 元数据失败: {}", objectKey, e);
+            log.error("aliyun oss metadata read failed. objectKey={}", objectKey, e);
             throw new ServiceException(FileStorageError.STORAGE_PROVIDER_READ_FILE_FAILED);
         }
     }

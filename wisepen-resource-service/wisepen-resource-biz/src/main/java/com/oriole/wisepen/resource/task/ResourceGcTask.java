@@ -38,21 +38,32 @@ public class ResourceGcTask {
 
     @Scheduled(cron = "${wisepen.resource.physical-gc-cron:0 0 3 * * ?}")
     public void garbageCollection() {
+        long startMs = System.currentTimeMillis();
         int retentionDays = resourceProperties.getDeletedRetentionDays();
         LocalDateTime threshold = LocalDateTime.now().minusDays(retentionDays);
 
-        log.info("resourceGc started retentionDays={}", retentionDays);
+        log.info("resource gc started. task=physicalDelete retentionDays={}", retentionDays);
+        try {
         // 彻底删除 TRASH_COLLECTION 中超过保留期的小组配置
-        cleanupExpiredGroups(threshold);
+            int purgedGroups = cleanupExpiredGroups(threshold);
         // 个人回收站 (.Trash) 中停留过久的资源，转移至 RESOURCE_TRASH_COLLECTION
-        cleanupExpiredResourcesInUserTrash(threshold);
+            int purgedUserTrashResources = cleanupExpiredResourcesInUserTrash(threshold);
         // 彻底删除 RESOURCE_TRASH_COLLECTION 中超过保留期的资源
-        cleanupExpiredResources(threshold);
+            int purgedResources = cleanupExpiredResources(threshold);
+            int processed = purgedGroups + purgedUserTrashResources + purgedResources;
 
-        log.info("resourceGc finished");
+            log.info("resource gc finished. task=physicalDelete processed={} purgedGroups={} purgedUserTrashResources={} purgedResources={} failed=0 costMs={}",
+                    processed, purgedGroups, purgedUserTrashResources, purgedResources, System.currentTimeMillis() - startMs);
+        } catch (Exception e) {
+            log.error("resource gc failed. task=physicalDelete costMs={}", System.currentTimeMillis() - startMs, e);
+            if (e instanceof RuntimeException) {
+                throw (RuntimeException) e;
+            }
+            throw new IllegalStateException(e);
+        }
     }
 
-    private void cleanupExpiredGroups(LocalDateTime threshold) {
+    private int cleanupExpiredGroups(LocalDateTime threshold) {
         List<GroupResConfigEntity> expired = mongoTemplate.find(
                 Query.query(Criteria.where("dissolvedAt").lt(threshold)),
                 GroupResConfigEntity.class,
@@ -65,12 +76,13 @@ public class ResourceGcTask {
             }
             List<String> groupIds = expired.stream()
                     .map(GroupResConfigEntity::getGroupId).collect(Collectors.toList());
-            log.info("expiredGroups purged count={} groupIds={}",
+            log.info("expired groups purged. count={} groupIds={}",
                     expired.size(), summarizeIds(groupIds));
         }
+        return expired.size();
     }
 
-    private void cleanupExpiredResourcesInUserTrash(LocalDateTime threshold) {
+    private int cleanupExpiredResourcesInUserTrash(LocalDateTime threshold) {
         // 获取所有个人空间的 .Trash 根节点
         Query trashQuery = Query.query(Criteria.where("tagName").is(TRASH_TAG_NAME)
                 .and("parentId").is("0")
@@ -114,16 +126,17 @@ public class ResourceGcTask {
 
         // 文件夹与散落文件分别独立出日志，避免混合统计两类不同实体
         if (!purgedFolderIds.isEmpty()) {
-            log.info("userTrashFolders purged count={} folderIds={}",
+            log.info("user trash folders purged. count={} folderIds={}",
                     purgedFolderIds.size(), summarizeIds(purgedFolderIds));
         }
         if (!purgedFileIds.isEmpty()) {
-            log.info("userTrashFiles purged count={} resourceIds={}",
+            log.info("user trash files purged. count={} resourceIds={}",
                     purgedFileIds.size(), summarizeIds(purgedFileIds));
         }
+        return purgedFolderIds.size() + purgedFileIds.size();
     }
 
-    private void cleanupExpiredResources(LocalDateTime threshold) {
+    private int cleanupExpiredResources(LocalDateTime threshold) {
         Query physicalDeleteQuery = Query.query(Criteria.where("deletedAt").lt(threshold));
         List<ResourceItemEntity> expired = mongoTemplate.find(physicalDeleteQuery, ResourceItemEntity.class, RESOURCE_TRASH_COLLECTION);
         if (!expired.isEmpty()) {
@@ -131,8 +144,9 @@ public class ResourceGcTask {
                     .map(ResourceItemEntity::getResourceId)
                     .collect(Collectors.toList());
             resourceService.hardRemoveResources(resourceIds);
-            log.info("expiredResources purged count={} resourceIds={}",
+            log.info("expired resources purged. count={} resourceIds={}",
                     expired.size(), summarizeIds(resourceIds));
         }
+        return expired.size();
     }
 }

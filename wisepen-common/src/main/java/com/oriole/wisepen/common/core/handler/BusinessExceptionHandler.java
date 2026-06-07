@@ -1,6 +1,5 @@
 package com.oriole.wisepen.common.core.handler;
 
-import cn.hutool.json.JSONUtil;
 import com.oriole.wisepen.common.core.constant.CommonError;
 import com.oriole.wisepen.common.core.domain.IResult;
 import com.oriole.wisepen.common.core.domain.R;
@@ -35,7 +34,8 @@ public class BusinessExceptionHandler {
     public R<Void> handleServiceException(ServiceException e, HttpServletResponse response) {
         IResult errorResult = e.getErrorResult();
         response.setStatus(HttpServletResponse.SC_OK);
-        log.warn("业务异常: code={}, msgKey={}, msg={}", errorResult.getCode(), errorResult.getKey().toString(), e.getMessage());
+        log.warn("business exception handled. code={} msgKey={} msg={}",
+                errorResult.getCode(), errorResult.getKey(), e.getMessage());
         return R.fail(errorResult, e.getMessage());
     }
 
@@ -48,14 +48,15 @@ public class BusinessExceptionHandler {
             default -> HttpServletResponse.SC_UNAUTHORIZED;
         };
         response.setStatus(httpStatus);
-        log.warn("权限异常: code={}, msgKey={}, msg={}", errorResult.getCode(), errorResult.getKey().toString(), e.getMessage());
+        log.warn("permission exception handled. code={} msgKey={} msg={}",
+                errorResult.getCode(), errorResult.getKey(), e.getMessage());
         return R.fail(errorResult, e.getMessage());
     }
 
     //兜底异常
     @ExceptionHandler(Exception.class)
     public R<Map<String, Object>> handleException(Exception e, HttpServletResponse response) {
-        log.error("系统内部错误", e);
+        log.error("internal error handled. exception={}", e.getClass().getSimpleName(), e);
 
         // 原始异常
         int httpStatus = HttpServletResponse.SC_INTERNAL_SERVER_ERROR;

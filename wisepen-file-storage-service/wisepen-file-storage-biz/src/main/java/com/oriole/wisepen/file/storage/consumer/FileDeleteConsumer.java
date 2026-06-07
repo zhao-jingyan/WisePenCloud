@@ -12,6 +12,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 
+import static com.oriole.wisepen.common.core.util.LogIdUtils.summarizeIds;
 import static com.oriole.wisepen.file.storage.api.constant.MqTopicConstants.TOPIC_FILE_DELETE;
 
 @Slf4j
@@ -23,11 +24,19 @@ public class FileDeleteConsumer {
     private final ObjectMapper objectMapper;
 
     @KafkaListener(topics = TOPIC_FILE_DELETE, groupId = "wisepen-storage-file-delete-group")
-    public void onObjectDeleted(String payload) throws JsonProcessingException {
+    public void onObjectDeleted(String payload) throws Exception {
         // 可能从非Java微服务订阅，使用objectMapper显式转换
         List<String> objectKeys = objectMapper.readValue(payload, new TypeReference<List<String>>() {});
-        log.debug("接收到 Object 删除事件 objectKeys={}", objectKeys);
-        storageService.deleteFiles(objectKeys);
-        log.debug("已处理 Object 删除事件  objectKeys={}", objectKeys);
+        log.info("file delete event received. topic={} count={} objectKeys={}",
+                TOPIC_FILE_DELETE, objectKeys.size(), summarizeIds(objectKeys));
+        try {
+            storageService.deleteFiles(objectKeys);
+            log.debug("file delete event consumed. topic={} count={} objectKeys={}",
+                    TOPIC_FILE_DELETE, objectKeys.size(), summarizeIds(objectKeys));
+        } catch (Exception e) {
+            log.error("file delete event consumption failed. topic={} count={} objectKeys={}",
+                    TOPIC_FILE_DELETE, objectKeys.size(), summarizeIds(objectKeys), e);
+            throw e;
+        }
     }
 }

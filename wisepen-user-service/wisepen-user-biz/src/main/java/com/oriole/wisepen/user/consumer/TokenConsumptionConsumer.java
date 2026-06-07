@@ -23,8 +23,16 @@ public class TokenConsumptionConsumer {
 			}
 	)
 	public void onTokenConsumption(TokenConsumptionMessage message) {
-		log.debug("接收到 Token 消耗事件 TraceId={}", message.getTraceId());
-		walletService.consumptionToken(message);
-		log.debug("已处理 Token 消耗事件 TraceId={}", message.getTraceId());
+		log.info("token consumption event received. topic={} traceId={}",
+				TOPIC_TOKEN_CONSUMPTION, message.getTraceId());
+		try {
+			walletService.consumptionToken(message);
+			log.debug("token consumption event consumed. topic={} traceId={}",
+					TOPIC_TOKEN_CONSUMPTION, message.getTraceId());
+		} catch (Exception e) {
+			log.error("token consumption event consumption failed. topic={} traceId={}",
+					TOPIC_TOKEN_CONSUMPTION, message.getTraceId(), e);
+			throw e;
+		}
 	}
 }

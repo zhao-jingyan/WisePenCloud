@@ -46,7 +46,8 @@ public class AuthService {
         Map<String, Integer> groupRoleMap = groupMemberService.getGroupRoleMapByUserId(user.getUserId());
 
         String sessionId = redisCacheManager.setSession(user.getUserId(), user.getIdentityType(), groupRoleMap);
-        log.info("用户登录成功: sessionId={}, account={}, userId={}, groupRoleMap={}", sessionId, account, user.getUserId(), groupRoleMap);
+        log.info("login succeeded. account={} userId={} groupCount={}",
+                account, user.getUserId(), groupRoleMap.size());
         return sessionId;
     }
 
@@ -58,6 +59,6 @@ public class AuthService {
             return;
         }
         redisCacheManager.deleteSession(sessionId, userId);
-        log.info("用户注销成功: sessionId={}, userId={}", sessionId, userId);
+        log.info("logout succeeded. userId={}", userId);
     }
 }

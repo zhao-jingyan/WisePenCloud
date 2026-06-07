@@ -34,7 +34,17 @@ public class StorageController {
      * @param scene   业务场景
      * @param bizTag  业务隔离标识
      */
-    @Operation(summary = "上传图床图片")
+    @Operation(
+            summary = "上传图床图片",
+            description = """
+                    - 用途：代理当前用户上传小尺寸图片并生成可访问的存储记录。
+                    - 请求：file 为图片文件；scene 指定图片存储场景；bizTag 为业务隔离目录标识，可为空。
+                    - 约束：当前用户必须已登录；文件扩展名只能是 jpg、jpeg、png、gif 或 webp；scene 只能属于用户公开图片、小组公开图片或笔记私有图片场景；文件大小不能超过小文件代理上传上限。
+                    - 处理：校验文件类型和场景后直接上传到主存储配置，创建 AVAILABLE 状态的存储记录；不走预签名直传和上传完成回调流程。
+                    - 失败：未登录 -> PermissionError.NOT_LOGIN；文件类型不支持 -> FileStorageError.CANNOT_SUPPORT_FILE_TYPE；场景不支持 -> FileStorageError.CANNOT_SUPPORT_FILE_STORAGE_SCENE；文件过大 -> FileStorageError.FILE_SIZE_ABOVE_UPPER_BOUND；存储上传失败 -> FileStorageError.STORAGE_PROVIDER_UPLOAD_FILE_FAILED。
+                    - 响应：返回存储记录、objectKey 和访问域名信息。
+                    """
+    )
     @PostMapping("/imageUpload")
     public R<StorageRecordDTO> uploadImageProxy(
             @RequestParam("file") MultipartFile file,

@@ -47,7 +47,7 @@ public class NoteServiceImpl implements INoteService {
                             .build()
             ).getData();
         } catch (Exception e) {
-            log.error("resource 服务注册 Note 资源失败", e);
+            log.error("note resource register failed. dependency=resourceService", e);
             throw new ServiceException(NoteError.NOTE_REGISTER_RESOURCE_FAILED, e.getMessage());
         }
 

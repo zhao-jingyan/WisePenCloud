@@ -36,7 +36,8 @@ public class StorageGcTask {
      */
     @Scheduled(cron = "${wisepen.storage.zombie-cleanup-cron:0 0 */2 * * ?}")
     public void cleanupUploadingZombies() {
-        log.info("开始执行 [UPLOADING 死信清理] 定时任务...");
+        long start = System.currentTimeMillis();
+        log.info("storage gc started. task=uploadingZombie");
         LocalDateTime threshold = LocalDateTime.now().minusHours(storageProperties.getUploadingTimeoutHours());
 
         // 每次最多处理 500 条，防止内存溢出和数据库长事务
@@ -48,11 +49,14 @@ public class StorageGcTask {
         );
 
         if (zombies.isEmpty()) {
+            log.info("storage gc finished. task=uploadingZombie processed=0 recovered=0 deleted=0 failed=0 costMs={}",
+                    System.currentTimeMillis() - start);
             return;
         }
 
         int recoveredCount = 0;
         int deletedCount = 0;
+        int failedCount = 0;
 
         for (StorageRecordEntity zombie : zombies) {
             try {
@@ -66,10 +70,12 @@ public class StorageGcTask {
                 }
             } catch (Exception e) {
                 // 单条失败不能影响后续遍历
-                log.error("处理死信文件异常: {}", zombie.getObjectKey(), e);
+                failedCount++;
+                log.warn("storage zombie recover failed. objectKey={}", zombie.getObjectKey(), e);
             }
         }
-        log.info("结束 [UPLOADING 死信清理]: 补偿恢复 {} 个, 物理抹除 {} 个无用占位符", recoveredCount, deletedCount);
+        log.info("storage gc finished. task=uploadingZombie processed={} recovered={} deleted={} failed={} costMs={}",
+                zombies.size(), recoveredCount, deletedCount, failedCount, System.currentTimeMillis() - start);
     }
 
     /**
@@ -78,7 +84,8 @@ public class StorageGcTask {
      */
     @Scheduled(cron = "${wisepen.storage.physical-gc-cron:0 0 3 * * ?}")
     public void physicalGarbageCollection() {
-        log.info("开始执行 [DELETED 物理垃圾回收] 定时任务...");
+        long start = System.currentTimeMillis();
+        log.info("storage gc started. task=physicalDelete");
         LocalDateTime threshold = LocalDateTime.now().minusDays(storageProperties.getDeletedRetentionDays());
 
         List<StorageRecordEntity> trashes = storageRecordMapper.selectList(
@@ -90,10 +97,13 @@ public class StorageGcTask {
         );
 
         if (trashes.isEmpty()) {
+            log.info("storage gc finished. task=physicalDelete processed=0 deleted=0 failed=0 costMs={}",
+                    System.currentTimeMillis() - start);
             return;
         }
 
         int successCount = 0;
+        int failedCount = 0;
         for (StorageRecordEntity trash : trashes) {
             try {
                 // 先删云端物理文件
@@ -104,9 +114,11 @@ public class StorageGcTask {
                 storageRecordMapper.deleteById(trash.getFileId());
                 successCount++;
             } catch (Exception e) {
-                log.error("物理回收垃圾文件失败: {}", trash.getObjectKey(), e);
+                failedCount++;
+                log.warn("storage physical delete failed. objectKey={}", trash.getObjectKey(), e);
             }
         }
-        log.info("结束 [DELETED 物理垃圾回收]: 彻底抹除 {} 个云端垃圾文件", successCount);
+        log.info("storage gc finished. task=physicalDelete processed={} deleted={} failed={} costMs={}",
+                trashes.size(), successCount, failedCount, System.currentTimeMillis() - start);
     }
 }

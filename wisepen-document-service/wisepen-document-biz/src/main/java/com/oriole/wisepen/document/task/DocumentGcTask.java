@@ -28,20 +28,36 @@ public class DocumentGcTask {
 
     @Scheduled(fixedDelayString = "${wisepen.document.stale-check-delay-ms:300000}")
     public void detectStaleUploads() {
+        long start = System.currentTimeMillis();
+        log.info("document gc started. task=staleUpload");
+        try {
         // 查找所有正在上传的文档
-        List<DocumentInfoEntity> uploadingDocumentInfoEntities = documentInfoRepository.findByStatus(DocumentStatusEnum.UPLOADING);
-        if (uploadingDocumentInfoEntities == null || uploadingDocumentInfoEntities.isEmpty()) {
-            return;
-        }
-        log.debug("发现 {} 个 UPLOADING 文档，开始超时检测", uploadingDocumentInfoEntities.size());
-        LocalDateTime now = LocalDateTime.now();
-        for (DocumentInfoEntity entity : uploadingDocumentInfoEntities) {
-            Long size = entity.getUploadMeta() != null ? entity.getUploadMeta().getSize() : null;
-            long timeoutMs = calculateTimeoutMs(size);
-            LocalDateTime deadline = entity.getCreateTime().plusNanos(timeoutMs * 1_000_000L);
-            if (now.isAfter(deadline)) {
-                handleStaleDocument(entity);
+            List<DocumentInfoEntity> uploadingDocumentInfoEntities = documentInfoRepository.findByStatus(DocumentStatusEnum.UPLOADING);
+            if (uploadingDocumentInfoEntities == null || uploadingDocumentInfoEntities.isEmpty()) {
+                log.info("document gc finished. task=staleUpload processed=0 timedOut=0 failed=0 costMs={}",
+                        System.currentTimeMillis() - start);
+                return;
             }
+            log.debug("document gc candidates found. task=staleUpload pending={}", uploadingDocumentInfoEntities.size());
+            LocalDateTime now = LocalDateTime.now();
+            int timedOut = 0;
+            for (DocumentInfoEntity entity : uploadingDocumentInfoEntities) {
+                Long size = entity.getUploadMeta() != null ? entity.getUploadMeta().getSize() : null;
+                long timeoutMs = calculateTimeoutMs(size);
+                LocalDateTime deadline = entity.getCreateTime().plusNanos(timeoutMs * 1_000_000L);
+                if (now.isAfter(deadline)) {
+                    handleStaleDocument(entity);
+                    timedOut++;
+                }
+            }
+            log.info("document gc finished. task=staleUpload processed={} timedOut={} failed=0 costMs={}",
+                    uploadingDocumentInfoEntities.size(), timedOut, System.currentTimeMillis() - start);
+        } catch (Exception e) {
+            log.error("document gc failed. task=staleUpload costMs={}", System.currentTimeMillis() - start, e);
+            if (e instanceof RuntimeException) {
+                throw (RuntimeException) e;
+            }
+            throw new IllegalStateException(e);
         }
     }
 

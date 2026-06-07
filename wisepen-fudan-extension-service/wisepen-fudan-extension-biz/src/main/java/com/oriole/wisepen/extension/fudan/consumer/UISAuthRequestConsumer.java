@@ -30,13 +30,18 @@ public class UISAuthRequestConsumer {
     private final ObjectMapper objectMapper;
 
     @KafkaListener(topics = MqTopicConstants.FUDAN_UIS_AUTH_REQ, groupId = "wisepen-extension-fudan-uis-auth-group")
-    public void handleUisAuthRequest(String payload) throws JsonProcessingException {
+    public void handleUisAuthRequest(String payload) throws Exception {
         FudanUISAuthRequestMessage msg = objectMapper.readValue(payload, FudanUISAuthRequestMessage.class);
+        log.info("uis auth request received. topic={} userId={} account={}",
+                MqTopicConstants.FUDAN_UIS_AUTH_REQ, msg.getUserId(), msg.getAccount());
         runScraper(msg.getUserId(), msg.getAccount(), msg.getPassword());
+        log.debug("uis auth request consumed. topic={} userId={}",
+                MqTopicConstants.FUDAN_UIS_AUTH_REQ, msg.getUserId());
     }
 
     private void runScraper(Long uid, String account, String password) {
         redisCacheManager.setUisTaskStatus(uid, FudanUISTaskResultDTO.of(FudanUISTaskState.PENDING));
+        log.debug("uis auth task changed. userId={} from=NEW to=PENDING", uid);
 
         try (Playwright playwright = Playwright.create()) {
             Browser browser = playwright.chromium().launch(new BrowserType.LaunchOptions()
@@ -56,12 +61,14 @@ public class UISAuthRequestConsumer {
             String base64Image = extractQrBase64(qrResponse.text());
             if (base64Image == null) {
                 redisCacheManager.setUisTaskStatus(uid, FudanUISTaskResultDTO.of(FudanUISTaskState.FAILED_AUTH));
+                log.warn("uis auth task changed. userId={} from=PENDING to=FAILED_AUTH reason=\"qr code missing\"", uid);
                 return;
             }
 
             FudanUISTaskResultDTO waitingDto = FudanUISTaskResultDTO.of(FudanUISTaskState.WAITING_SCAN);
             waitingDto.setQrBase64(base64Image);
             redisCacheManager.setUisTaskStatus(uid, waitingDto);
+            log.debug("uis auth task changed. userId={} from=PENDING to=WAITING_SCAN", uid);
 
             try {
                 page.waitForURL(Pattern.compile(".*my\\.fudan\\.edu\\.cn.*"),
@@ -74,15 +81,16 @@ public class UISAuthRequestConsumer {
                 FudanUISTaskResultDTO successDto = FudanUISTaskResultDTO.of(FudanUISTaskState.SUCCESS);
                 successDto.setProfile(infoMap);
                 redisCacheManager.setUisTaskStatus(uid, successDto);
+                log.info("uis auth task changed. userId={} from=WAITING_SCAN to=SUCCESS", uid);
 
             } catch (TimeoutError e) {
-                log.error("UID {} UIS认证超时", uid, e);
                 redisCacheManager.setUisTaskStatus(uid, FudanUISTaskResultDTO.of(FudanUISTaskState.FAILED_TIMEOUT));
+                log.error("uis auth task changed. userId={} from=WAITING_SCAN to=FAILED_TIMEOUT reason=\"scan timeout\"", uid, e);
             }
 
         } catch (Exception e) {
-            log.error("UID {} UIS认证异常", uid, e);
             redisCacheManager.setUisTaskStatus(uid, FudanUISTaskResultDTO.of(FudanUISTaskState.FAILED_ERROR));
+            log.error("uis auth task changed. userId={} from=PENDING to=FAILED_ERROR", uid, e);
         }
     }
 

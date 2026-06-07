@@ -49,9 +49,9 @@ public class SearchSyncServiceImpl implements ISearchSyncService {
     public void deleteResourceIndex(String resourceId) {
         try {
             esIndexRepository.deleteById(resourceId);
-            log.info("ES doc deleted resourceId={}", resourceId);
+            log.info("search document deleted. resourceId={}", resourceId);
         } catch (Exception e) {
-            log.warn("ES delete failed resourceId={}", resourceId, e);
+            log.warn("search document delete failed. resourceId={}", resourceId, e);
         }
     }
 
@@ -62,10 +62,10 @@ public class SearchSyncServiceImpl implements ISearchSyncService {
             if (!indexOps.exists()) {
                 indexOps.create();
                 indexOps.putMapping();
-                log.info("ES index created indexName={}", SearchConstants.RESOURCE_INDEX_NAME);
+                log.info("search index created. indexName={}", SearchConstants.RESOURCE_INDEX_NAME);
             }
         } catch (Exception e) {
-            log.warn("ES index ensure failed indexName={}", SearchConstants.RESOURCE_INDEX_NAME, e);
+            log.warn("search index ensure failed. indexName={}", SearchConstants.RESOURCE_INDEX_NAME, e);
         }
 
         try {
@@ -96,9 +96,9 @@ public class SearchSyncServiceImpl implements ISearchSyncService {
                     .build();
 
             elasticsearchOperations.update(updateQuery, INDEX);
-            log.debug("ES upsert ok resourceId={} fields={}", entity.getResourceId(), fields);
+            log.debug("search document upsert succeeded. resourceId={} fields={}", entity.getResourceId(), fields);
         } catch (Exception e) {
-            log.error("ES upsert failed resourceId={} fields={}", entity.getResourceId(), fields, e);
+            log.error("search document upsert failed. resourceId={} fields={}", entity.getResourceId(), fields, e);
             throw new ServiceException(ResourceError.RESOURCE_SEARCH_FAILED);
         }
     }

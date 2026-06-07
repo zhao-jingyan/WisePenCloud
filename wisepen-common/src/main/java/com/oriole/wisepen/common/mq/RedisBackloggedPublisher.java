@@ -38,7 +38,7 @@ public class RedisBackloggedPublisher implements ReliablePublisher {
             String finalDedupKey = dedupKey;
             kafkaTemplate.send(topic, finalDedupKey, payload).whenComplete((sendResult, ex) -> {
                 if (ex == null) {
-                    log.debug("message published topic={} key={} dedupKey={}", topic, kafkaKey, finalDedupKey);
+                    log.debug("message published. topic={} key={} dedupKey={}", topic, kafkaKey, finalDedupKey);
                     result.complete(null);
                     return;
                 }
@@ -58,7 +58,7 @@ public class RedisBackloggedPublisher implements ReliablePublisher {
             try {
                 drainBacklog(topic);
             } catch (Exception e) {
-                log.warn("backlog drain failed topic={} reason=unexpected", topic, e);
+                log.warn("backlog drain failed. topic={}", topic, e);
             }
         });
     }
@@ -97,11 +97,11 @@ public class RedisBackloggedPublisher implements ReliablePublisher {
                 } catch (Exception e) {
                     // 失败则保留在 Redis，下次再补偿
                     failed++;
-                    log.warn("backlog drain failed topic={} dedupKey={}", topic, dedupKey, e);
+                    log.warn("backlog drain failed. topic={} dedupKey={}", topic, dedupKey, e);
                 }
             }
 
-            log.info("backlog drained topic={} succeeded={} failed={}", topic, succeeded, failed);
+            log.info("backlog drained. topic={} succeeded={} failed={}", topic, succeeded, failed);
         } finally {
             // 释放锁
             redisTemplate.delete(lockKey);
@@ -121,10 +121,10 @@ public class RedisBackloggedPublisher implements ReliablePublisher {
             // 写入 Redis，相同 dedupKey 的失败消息会被覆盖
             redisTemplate.opsForHash().put(backlogKey, dedupKey, backlogMessage);
             redisTemplate.expire(backlogKey, BACKLOG_TTL);
-            log.warn("message publish failed topic={} key={} dedupKey={} enqueued=true",
+            log.warn("message publish failed. topic={} key={} dedupKey={} enqueued=true",
                     topic, kafkaKey, dedupKey, publishError);
         } catch (Exception enqueueError) {
-            log.error("backlog enqueue failed topic={} key={} dedupKey={} payload={}",
+            log.error("backlog enqueue failed. topic={} key={} dedupKey={} payload={}",
                     topic, kafkaKey, dedupKey, payload, enqueueError);
         }
     }

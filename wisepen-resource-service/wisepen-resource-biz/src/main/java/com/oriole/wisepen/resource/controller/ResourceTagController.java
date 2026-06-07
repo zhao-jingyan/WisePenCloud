@@ -23,7 +23,7 @@ import java.util.List;
 
 import static com.oriole.wisepen.resource.constant.ResourceConstants.PERSONAL_GROUP_PREFIX;
 
-@Tag(name = "资源标签管理", description = "个人标签与小组资源标签的增删改查及拖拽")
+@Tag(name = "资源标签", description = "个人与小组资源标签的树形维护、权限配置和回收站处理")
 @RestController
 @RequestMapping("/resource/tag")
 @RequiredArgsConstructor
@@ -33,7 +33,17 @@ public class ResourceTagController {
     private final ITagService tagService;
 
     // 获取指定用户组的完整 Tag 树
-    @Operation(summary = "获取完整标签树", description = "获取个人或小组的标签树")
+    @Operation(
+            summary = "获取标签树",
+            description = """
+                    - 用途：获取个人或小组资源空间的完整标签树，供资源浏览、挂载和标签维护使用。
+                    - 请求：groupId 为空表示当前用户个人标签空间，非空表示指定小组标签空间。
+                    - 约束：个人空间要求当前用户已登录；小组空间要求当前用户属于目标小组。
+                    - 处理：一次性读取目标空间的全部标签并在内存中组装树；个人空间缺少系统根节点或回收站节点时会自动初始化；不修改普通业务标签。
+                    - 失败：未登录 -> PermissionError.NOT_LOGIN；当前用户不属于目标小组 -> PermissionError.PERMISSION_DENIED。
+                    - 响应：返回标签树根节点列表及其子节点。
+                    """
+    )
     @GetMapping("/getTagTree")
     public R<List<TagTreeResponse>> getTagTree(@RequestParam(required = false, value = "groupId") String groupId) {
         TagSpaceBase tagSpaceBase = new TagSpaceBase(groupId);
@@ -42,16 +52,36 @@ public class ResourceTagController {
     }
 
     // 创建 Tag 节点
-    @PostMapping("/addTag")
-    @Operation(summary = "创建标签", description = "在个人或小组指定的父节点下创建新标签（小组需管理权限）")
+    @Operation(
+            summary = "创建标签",
+            description = """
+                    - 用途：在个人或小组资源空间的指定父节点下创建新的资源标签。
+                    - 请求：groupId 为空表示个人标签空间，非空表示小组标签空间；parentId 为空或 0 表示创建在根层级；tagName 为新标签名称，其余字段描述标签可见性、挂载权限和默认动作。
+                    - 约束：小组空间写入要求当前用户是 OWNER 或 ADMIN；不能在回收站及其子目录下创建标签；不能使用系统根节点或回收站保留名称；同一父节点下名称必须唯一。
+                    - 处理：根据父节点继承路径标签类型并计算 ancestors；个人标签会清空所有标签权限配置；创建成功后只新增标签节点，不自动移动资源。
+                    - 失败：未登录 -> PermissionError.NOT_LOGIN；小组写入权限不足 -> PermissionError.PERMISSION_DENIED；父节点不存在 -> ResourceError.PARENT_TAG_NODE_NOT_FOUND；同级重名 -> ResourceError.TAG_NODE_NAME_CONFLICT；使用系统保留名称 -> ResourceError.CANNOT_USE_RESERVED_TAG_PATH_NODE_NAME；在回收站下创建 -> ResourceError.CANNOT_OPERATE_TRASHED_TAG_PATH_NODE。
+                    - 响应：返回新建标签 ID。
+                    """
+    )
     @Log(title = "创建标签", businessType = BusinessType.INSERT)
+    @PostMapping("/addTag")
     public R<String> createTag(@Validated @RequestBody TagCreateRequest tagCreateRequest) {
         checkPermission(tagCreateRequest, true);
         return R.ok(tagService.createTag(tagCreateRequest));
     }
 
     // 更新 Tag (重命名、修改可见性规则等)
-    @Operation(summary = "更新标签", description = "修改个人或小组标签的元信息（小组需管理权限，个人不可设置可见性规则）")
+    @Operation(
+            summary = "更新标签",
+            description = """
+                    - 用途：维护标签名称、资源可见性规则、资源挂载权限和标签默认动作配置。
+                    - 请求：targetTagId 指定目标标签；groupId 确定标签空间；tagName、权限范围、指定用户和 grantedActions 表达本次要更新的配置。
+                    - 约束：小组空间写入要求当前用户是 OWNER 或 ADMIN；目标标签必须存在且不在回收站中；系统根节点和回收站节点不能修改；个人标签不能设置可见性或挂载权限；新名称不能使用保留名称且不能与同级标签重名。
+                    - 处理：更新标签基本信息和权限配置，isPath 始终不允许由本接口改变；小组标签权限发生变化时通知挂载在该标签及其子孙标签下的资源重新计算 ACL；不移动标签位置。
+                    - 失败：未登录 -> PermissionError.NOT_LOGIN；小组写入权限不足 -> PermissionError.PERMISSION_DENIED；标签不存在 -> ResourceError.TAG_NODE_NOT_FOUND；系统标签被修改 -> ResourceError.CANNOT_MODIFY_SYSTEM_TAG_PATH_NODE；个人标签设置权限 -> ResourceError.CANNOT_SET_TAG_NODE_VISIBILITY；同级重名 -> ResourceError.TAG_NODE_NAME_CONFLICT；使用系统保留名称 -> ResourceError.CANNOT_USE_RESERVED_TAG_PATH_NODE_NAME；回收站内标签被修改 -> ResourceError.CANNOT_OPERATE_TRASHED_TAG_PATH_NODE。
+                    - 响应：成功时返回空结果。
+                    """
+    )
     @Log(title = "修改标签", businessType = BusinessType.UPDATE)
     @PostMapping("/changeTag")
     public R<Void> updateTag(@Validated @RequestBody TagUpdateRequest tagUpdateRequest) {
@@ -61,7 +91,17 @@ public class ResourceTagController {
     }
 
     // 拖拽移动 Tag (改变树形层级结构)
-    @Operation(summary = "拖拽/移动标签", description = "修改个人或小组标签的树形层级结构（小组需管理权限）")
+    @Operation(
+            summary = "移动标签",
+            description = """
+                    - 用途：调整个人或小组资源标签在树形结构中的父子层级。
+                    - 请求：targetTagId 指定被移动标签；newParentId 为空或 0 表示移动到根层级；groupId 确定标签空间。
+                    - 约束：小组空间写入要求当前用户是 OWNER 或 ADMIN；目标标签不能是系统根节点或回收站节点；不能移动到自身或自身子孙节点下；不能跨路径标签和普通标签类型移动；不能移动到回收站内部节点。
+                    - 处理：更新目标标签和全部子孙标签的 parentId 与 ancestors；移动到个人回收站节点时发布回收站事件以剥离相关资源小组权限，普通移动会触发受影响资源 ACL 重算；不修改资源文件内容。
+                    - 失败：未登录 -> PermissionError.NOT_LOGIN；小组写入权限不足 -> PermissionError.PERMISSION_DENIED；目标标签不存在 -> ResourceError.TAG_NODE_NOT_FOUND；父标签不存在 -> ResourceError.PARENT_TAG_NODE_NOT_FOUND；移动到自身 -> ResourceError.CANNOT_MOVE_TAG_NODE_TO_SELF；移动到子孙节点 -> ResourceError.CANNOT_MOVE_TAG_NODE_TO_DESCENDANT；跨路径/普通标签类型移动 -> ResourceError.CANNOT_MOVE_TAG_NODE_ACROSS_TAG_TYPE；同级重名 -> ResourceError.TAG_NODE_NAME_CONFLICT；系统标签被移动 -> ResourceError.CANNOT_MOVE_SYSTEM_TAG_PATH_NODE；回收站内标签被移动 -> ResourceError.CANNOT_OPERATE_TRASHED_TAG_PATH_NODE。
+                    - 响应：成功时返回空结果。
+                    """
+    )
     @Log(title = "移动标签", businessType = BusinessType.UPDATE)
     @PostMapping("/moveTag")
     public R<Void> moveTag(@Validated @RequestBody TagMoveRequest tagMoveRequest) {
@@ -71,9 +111,19 @@ public class ResourceTagController {
     }
 
     // 级联删除 Tag 及其子孙节点
-    @PostMapping("/removeTag")
-    @Operation(summary = "级联删除标签", description = "删除个人或小组指定标签及其所有的子孙节点")
+    @Operation(
+            summary = "级联删除标签",
+            description = """
+                    - 用途：删除个人或小组资源空间中的指定标签及其所有子孙标签。
+                    - 请求：targetTagId 指定待删除标签；groupId 确定标签空间。
+                    - 约束：小组空间写入要求当前用户是 OWNER 或 ADMIN；系统根节点和回收站节点不能删除；路径标签在未强制删除且未进入回收站前不能直接删除。
+                    - 处理：删除目标标签和所有子孙标签，并发布标签删除事件；下游会根据标签类型清理资源绑定，路径标签删除可能导致相关资源进入后续软删除流程。
+                    - 失败：未登录 -> PermissionError.NOT_LOGIN；小组写入权限不足 -> PermissionError.PERMISSION_DENIED；标签不存在 -> ResourceError.TAG_NODE_NOT_FOUND；系统标签被删除 -> ResourceError.CANNOT_DELETE_SYSTEM_TAG_PATH_NODE；路径标签直接删除 -> ResourceError.CANNOT_DELETE_TAG_PATH_NODE_DIRECTLY。
+                    - 响应：成功时返回空结果。
+                    """
+    )
     @Log(title = "删除标签", businessType = BusinessType.DELETE)
+    @PostMapping("/removeTag")
     public R<Void> deleteTag(@Validated @RequestBody TagDeleteRequest tagDeleteRequest) {
         checkPermission(tagDeleteRequest, true);
         tagService.deleteTag(tagDeleteRequest, false);

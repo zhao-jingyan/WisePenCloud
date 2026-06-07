@@ -81,7 +81,7 @@ public class GroupResServiceImpl implements IGroupResService {
                 ? resourceItemRepository.findByGroupId(req.getGroupId())
                 : Collections.emptyList();
         int affectedCount = affectedResources == null ? 0 : affectedResources.size();
-        log.info("groupResConfig upserted groupId={} fileOrgLogic={} defaultMask={} defaultMaskChanged={} affectedResources={}",
+        log.info("group resource config upserted. groupId={} fileOrgLogic={} defaultMask={} defaultMaskChanged={} affectedResources={}",
                 req.getGroupId(), entity.getFileOrgLogic(), entity.getDefaultMemberActionsMask(),
                 shouldRecalculate, affectedCount);
 
@@ -111,7 +111,7 @@ public class GroupResServiceImpl implements IGroupResService {
         config.setDissolvedAt(LocalDateTime.now());
         mongoTemplate.save(config, CONFIG_TRASH_COLLECTION);
         groupResConfigRepository.deleteByGroupId(groupId);
-        log.info("groupResConfig deleted mode=soft groupId={}", groupId);
+        log.info("group resource config deleted. mode=soft groupId={}", groupId);
     }
 
     @Override
@@ -120,6 +120,6 @@ public class GroupResServiceImpl implements IGroupResService {
                 Query.query(Criteria.where("groupId").is(groupId)),
                 CONFIG_TRASH_COLLECTION
         );
-        log.info("groupResConfig deleted mode=hard groupId={}", groupId);
+        log.info("group resource config deleted. mode=hard groupId={}", groupId);
     }
 }

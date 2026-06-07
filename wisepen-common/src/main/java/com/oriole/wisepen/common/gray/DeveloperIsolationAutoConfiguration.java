@@ -47,7 +47,7 @@ public class DeveloperIsolationAutoConfiguration {
                 nacosProps.getMetadata().clear();
                 nacosProps.getMetadata().put(CommonConstants.GRAY_METADATA_DEV_KEY, developer);
                 GrayContextHolder.setProcessDefaultTag(developer);
-                log.warn("Development isolation is now active. Please include the X-Developer header in your requests.");
+                log.warn("development isolation activated. source=systemProperty developer={}", developer);
             }
             return;
         }
@@ -63,10 +63,10 @@ public class DeveloperIsolationAutoConfiguration {
             if ("true".equalsIgnoreCase(enable) && StringUtils.hasText(developer)) {
                 nacosProps.getMetadata().put(CommonConstants.GRAY_METADATA_DEV_KEY, developer);
                 GrayContextHolder.setProcessDefaultTag(developer);
-                log.warn("Development isolation is now active. Please include the X-Developer header in your requests.");
+                log.warn("development isolation activated. source=devProperties developer={}", developer);
             }
         } catch (Exception e) {
-            log.error("Development isolation failed", e);
+            log.error("development isolation failed. source=devProperties path={}", devFile.getAbsolutePath(), e);
         }
     }
 }

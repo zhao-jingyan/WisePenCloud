@@ -5,7 +5,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
 
-@Tag(name = "内部文档服务", description = "供其他微服务调用的文档接口")
+@Tag(name = "内部 - 文档", description = "供业务微服务调用的文档内部接口")
 @RestController
 @RequestMapping("/internal/document")
 @RequiredArgsConstructor

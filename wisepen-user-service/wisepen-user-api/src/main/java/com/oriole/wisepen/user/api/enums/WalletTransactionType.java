@@ -16,9 +16,9 @@ public enum WalletTransactionType {
     EXCHANGE(6, "EXCHANGE"),
     REVERSE(7, "REVERSE");
 
-    @EnumValue
-    @JsonValue
     private final int code;
 
+    @EnumValue
+    @JsonValue
     private final String value;
 }

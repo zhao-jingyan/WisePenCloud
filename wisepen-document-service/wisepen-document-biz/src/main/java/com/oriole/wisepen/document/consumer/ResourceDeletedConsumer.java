@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import static com.oriole.wisepen.common.core.util.LogIdUtils.summarizeIds;
 import static com.oriole.wisepen.resource.constant.MqTopicConstants.TOPIC_RESOURCE_PHYSICAL_DESTROY;
 
 @Slf4j
@@ -32,10 +33,21 @@ public class ResourceDeletedConsumer {
                 documentIds.addAll(idsForType);
             }
         }
+        log.info("document resource delete event received. topic={} count={} documentIds={}",
+                TOPIC_RESOURCE_PHYSICAL_DESTROY, documentIds.size(), summarizeIds(documentIds));
         if (!documentIds.isEmpty()) {
-            log.info("接收到 Document 资源硬删除事件 resourceIds={}", documentIds);
-            documentService.deleteDocuments(documentIds);
-            log.info("已处理 Document 资源硬删除事件 resourceIds={}", documentIds);
+            try {
+                documentService.deleteDocuments(documentIds);
+                log.debug("document resource delete event consumed. topic={} count={} documentIds={}",
+                        TOPIC_RESOURCE_PHYSICAL_DESTROY, documentIds.size(), summarizeIds(documentIds));
+            } catch (Exception e) {
+                log.error("document resource delete event consumption failed. topic={} count={} documentIds={}",
+                        TOPIC_RESOURCE_PHYSICAL_DESTROY, documentIds.size(), summarizeIds(documentIds), e);
+                throw e;
+            }
+        } else {
+            log.debug("document resource delete event skipped because no document resources. topic={}",
+                    TOPIC_RESOURCE_PHYSICAL_DESTROY);
         }
     }
 }

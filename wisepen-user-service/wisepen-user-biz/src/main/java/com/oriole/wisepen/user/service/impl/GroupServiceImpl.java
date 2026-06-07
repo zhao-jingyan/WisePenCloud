@@ -110,7 +110,7 @@ public class GroupServiceImpl implements IGroupService {
         try {
             remoteResourceService.dissolveGroup(groupId);
         } catch (Exception e) {
-            log.error("通知资源服务解散小组 {} 失败，资源数据将残留，需人工处理", groupId, e);
+            log.error("group dissolve notify failed. groupId={} dependency=resourceService", groupId, e);
         }
     }
 

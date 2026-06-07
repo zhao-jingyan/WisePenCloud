@@ -9,6 +9,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 
+import static com.oriole.wisepen.common.core.util.LogIdUtils.summarizeIds;
 import static com.oriole.wisepen.file.storage.api.constant.MqTopicConstants.TOPIC_FILE_DELETE;
 
 /**
@@ -28,10 +29,13 @@ public class KafkaSkillEventPublisher {
         try {
             // 发布至兼容非Java微服务的订阅者，统一使用 Jackson 序列化
             String jsonPayload = objectMapper.writeValueAsString(allObjectKeys);
+            int count = allObjectKeys.size();
             reliablePublisher.publish(TOPIC_FILE_DELETE, null, jsonPayload, null);
-            log.debug("成功发布文档删除事件 Document: {}", allObjectKeys);
+            log.debug("file delete event publish requested. topic={} count={} objectKeys={}",
+                    TOPIC_FILE_DELETE, count, summarizeIds(allObjectKeys));
         } catch (Exception e) {
-            log.error("发布文档解析删除失败 Document: {}", allObjectKeys, e);
+            log.error("file delete event publish request failed. topic={} count={} objectKeys={}",
+                    TOPIC_FILE_DELETE, allObjectKeys.size(), summarizeIds(allObjectKeys), e);
         }
     }
 }

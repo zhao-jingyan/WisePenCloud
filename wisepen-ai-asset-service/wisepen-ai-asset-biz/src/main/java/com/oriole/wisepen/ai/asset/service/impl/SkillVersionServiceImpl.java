@@ -111,7 +111,8 @@ public class SkillVersionServiceImpl implements ISkillVersionService {
                         .build()).getData();
             }
             catch (Exception e) {
-                log.warn("存储服务申请上传 URL 失败", e);
+                log.warn("skill asset upload init failed. resourceId={} version={} dependency=storageService",
+                        req.getResourceId(), req.getDraftVersion(), e);
                 throw new ServiceException(SkillError.SKILL_ASSET_UPLOAD_URL_APPLY_FAILED, e.getMessage());
             }
 
@@ -251,7 +252,6 @@ public class SkillVersionServiceImpl implements ISkillVersionService {
     }
 
     @Override
-    @Transactional
     public void handleFileUploaded(FileUploadedMessage msg) {
         if (msg.getScene() != StorageSceneEnum.PRIVATE_SKILL_ASSET){
             return; // 不处理非PRIVATE_SKILL_ASSET的上传通知
@@ -261,7 +261,7 @@ public class SkillVersionServiceImpl implements ISkillVersionService {
         if (version == null) {
             // 未找到对应的版本，删除文件
             eventPublisher.publishFileDeleteEvent(List.of(msg.getObjectKey()));
-            log.warn("未找到对应Skill版本，已经删除上传的文件 ObjectKey={}", msg.getObjectKey());
+            log.warn("skill asset upload compensated for missing version. objectKey={}", msg.getObjectKey());
             return;
         }
         SkillAssetInfoBase asset = null;
@@ -281,8 +281,9 @@ public class SkillVersionServiceImpl implements ISkillVersionService {
         asset.setSize(msg.getSize());
         asset.setUploadStatus(SkillAssetUploadStatus.AVAILABLE);
         skillVersionRepository.save(version);
-        log.info("skill asset upload callback handled resourceId={} version={} assetId={} objectKey={}",
-                version.getResourceId(), version.getVersion(), asset.getId(), msg.getObjectKey());
+
+        log.info("skill asset upload handled. resourceId={} version={} assetId={} objectKey={}",
+                        version.getResourceId(), version.getVersion(), asset.getId(), msg.getObjectKey());
     }
 
     @Override

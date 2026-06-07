@@ -10,7 +10,7 @@ version: '3.8'
 services:
   user-service:
     environment:
-      SPRING_CLOUD_INETUTILS_PREFERRED_NETWORKS: '^172\.28\.'
+      SPRING_CLOUD_INETUTILS_PREFERRED_NETWORKS: '172.28.'
     networks:
       cloud-infra_cloud-net:
         aliases:
@@ -18,7 +18,7 @@ services:
 
   system-service:
     environment:
-      SPRING_CLOUD_INETUTILS_PREFERRED_NETWORKS: '^172\.28\.'
+      SPRING_CLOUD_INETUTILS_PREFERRED_NETWORKS: '172.28.'
     networks:
       cloud-infra_cloud-net:
         aliases:
@@ -26,7 +26,7 @@ services:
 
   resource-service:
     environment:
-      SPRING_CLOUD_INETUTILS_PREFERRED_NETWORKS: '^172\.28\.'
+      SPRING_CLOUD_INETUTILS_PREFERRED_NETWORKS: '172.28.'
     networks:
       cloud-infra_cloud-net:
         aliases:
@@ -34,7 +34,7 @@ services:
 
   document-service:
     environment:
-      SPRING_CLOUD_INETUTILS_PREFERRED_NETWORKS: '^172\.28\.'
+      SPRING_CLOUD_INETUTILS_PREFERRED_NETWORKS: '172.28.'
     networks:
       cloud-infra_cloud-net:
         aliases:
@@ -42,7 +42,7 @@ services:
 
   file-storage-service:
     environment:
-      SPRING_CLOUD_INETUTILS_PREFERRED_NETWORKS: '^172\.28\.'
+      SPRING_CLOUD_INETUTILS_PREFERRED_NETWORKS: '172.28.'
     networks:
       cloud-infra_cloud-net:
         aliases:
@@ -50,7 +50,7 @@ services:
 
   fudan-extension-service:
     environment:
-      SPRING_CLOUD_INETUTILS_PREFERRED_NETWORKS: '^172\.28\.'
+      SPRING_CLOUD_INETUTILS_PREFERRED_NETWORKS: '172.28.'
     networks:
       cloud-infra_cloud-net:
         aliases:
@@ -58,15 +58,23 @@ services:
 
   note-service:
     environment:
-      SPRING_CLOUD_INETUTILS_PREFERRED_NETWORKS: '^172\.28\.'
+      SPRING_CLOUD_INETUTILS_PREFERRED_NETWORKS: '172.28.'
     networks:
       cloud-infra_cloud-net:
         aliases:
           - note-service
 
+  ai-asset-service:
+    environment:
+      SPRING_CLOUD_INETUTILS_PREFERRED_NETWORKS: '172.28.'
+    networks:
+      cloud-infra_cloud-net:
+        aliases:
+          - ai-asset-service
+
   docs-service:
     environment:
-      SPRING_CLOUD_INETUTILS_PREFERRED_NETWORKS: '^172\.28\.'
+      SPRING_CLOUD_INETUTILS_PREFERRED_NETWORKS: '172.28.'
     networks:
       cloud-infra_cloud-net:
         aliases:

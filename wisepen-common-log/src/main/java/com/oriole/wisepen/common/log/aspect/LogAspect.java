@@ -100,9 +100,8 @@ public class LogAspect {
             // 调用异步 Service
             asyncLogService.saveSysLog(operLog);
 
-        } catch (Exception exp) {
-            log.error("==前置通知异常==");
-            log.error("日志记录异常信息:{}", exp.getMessage());
+        } catch (Exception exception) {
+            log.error("audit log capture failed. method={}", joinPoint.getSignature().getName(), exception);
         }
     }
 

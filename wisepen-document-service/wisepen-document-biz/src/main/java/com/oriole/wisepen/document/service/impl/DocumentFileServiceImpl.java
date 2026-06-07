@@ -24,27 +24,27 @@ public class DocumentFileServiceImpl implements IDocumentFileService {
     @Override
     public void convertToPdf(File source, File target) {
         long start = System.currentTimeMillis();
-        log.info("Office → PDF 转换开始 {} ({} bytes)", source.getName(), source.length());
+        log.info("office to pdf conversion started. source={} size={}", source.getName(), source.length());
         try {
             documentConverter.convert(source).to(target).execute();
-            log.info("Office → PDF 转换完成 {} ms", System.currentTimeMillis() - start);
+            log.info("office to pdf conversion finished. costMs={}", System.currentTimeMillis() - start);
         } catch (OfficeException e) {
-            log.error("Office → PDF 转换失败 {} ms, file={}", System.currentTimeMillis() - start, source.getName(), e);
+            log.error("office to pdf conversion failed. costMs={} source={}", System.currentTimeMillis() - start, source.getName(), e);
             throw new ServiceException(DocumentError.DOCUMENT_PROCESS_CONVERT_FAILED);
         }
     }
 
     @Override
     public String extractText(File pdfFile) {
-        log.debug("文本提取开始 {}", pdfFile.getName());
+        log.debug("pdf text extraction started. source={}", pdfFile.getName());
         try (PDDocument doc = PDDocument.load(pdfFile)) {
             PDFTextStripper stripper = new PDFTextStripper();
             stripper.setSortByPosition(true); // 保留段落换行，去除多余空白
             String text = stripper.getText(doc);
-            log.debug("文本提取完成 {} CHARS", text.length());
+            log.debug("pdf text extraction finished. charCount={}", text.length());
             return text;
         } catch (IOException e) {
-            log.error("文本提取失败 {}", pdfFile.getName(), e);
+            log.error("pdf text extraction failed. source={}", pdfFile.getName(), e);
             throw new ServiceException(DocumentError.DOCUMENT_PROCESS_CONTENT_READ_FAILED);
         }
     }

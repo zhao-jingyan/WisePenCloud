@@ -39,6 +39,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+import static com.oriole.wisepen.common.core.util.LogIdUtils.summarizeIds;
+
 /**
  * 文档上传服务实现
  */
@@ -76,7 +78,7 @@ public class DocumentServiceImpl implements IDocumentService {
                     .build()).getData();
         }
         catch (Exception e) {
-            log.warn("存储服务申请上传 URL 失败", e);
+            log.warn("document upload init failed. documentId={} dependency=storageService", documentId, e);
             throw new ServiceException(DocumentError.DOCUMENT_UPLOAD_URL_APPLY_FAILED, e.getMessage());
         }
 
@@ -95,7 +97,7 @@ public class DocumentServiceImpl implements IDocumentService {
                 )).build();
         documentInfoRepository.save(entity);
 
-        log.info("文档上传初始化完成 DocumentId={} | ObjectKey={} | FlashUploaded={}",
+        log.info("document upload initialized. documentId={} objectKey={} flashUploaded={}",
                 documentId, uploadInitRespDTO.getObjectKey(), uploadInitRespDTO.getFlashUploaded());
 
         DocumentUploadInitResponse resp = BeanUtil.copyProperties(uploadInitRespDTO, DocumentUploadInitResponse.class);
@@ -163,7 +165,7 @@ public class DocumentServiceImpl implements IDocumentService {
                 this.finalizeToReady(documentId);
                 break;
         }
-        log.info("文档解析事件已发送 DocumentId={}", documentId);
+        log.info("document retry event dispatched. documentId={} status={}", documentId, entity.getDocumentStatus().getStatus());
     }
 
     @Override
@@ -181,7 +183,7 @@ public class DocumentServiceImpl implements IDocumentService {
         // NOTE：在CONVERTING_AND_PARSING或READY时不能终止
         // 但由于CONVERTING_AND_PARSING可能意外失败而未能进入READY，仍需清理所有CONVERTING_AND_PARSING可能产生的资产
         deleteDocuments(List.of(entity));
-        log.info("文档处理任务已终止 DocumentId={}", documentId);
+        log.info("document process aborted. documentId={}", documentId);
     }
 
     @Override
@@ -219,6 +221,8 @@ public class DocumentServiceImpl implements IDocumentService {
         documentContentRepository.deleteAllById(documentIds);
         documentPdfMetaRepository.deleteAllById(documentIds);
         documentInfoRepository.deleteAllById(documentIds);
+
+        log.info("documents deleted. count={} documentIds={}", documentIds.size(), summarizeIds(documentIds));
     }
 
     public Optional<DocumentStatus> getDocumentStatus(String documentId) {
@@ -238,7 +242,7 @@ public class DocumentServiceImpl implements IDocumentService {
             try {
                 storageRecordDTO = remoteStorageService.getFileRecord(entity.getSourceObjectKey()).getData();
             } catch (Exception e) {
-                log.warn("存储文件状态获取失败 DocumentId={}", documentId, e);
+                log.warn("document storage status get failed. documentId={} objectKey={}", documentId, entity.getSourceObjectKey(), e);
                 throw new ServiceException(DocumentError.DOCUMENT_STORAGE_STATUS_GET_FAILED, e.getMessage());
             }
             if (storageRecordDTO != null) { // 未上传完成的文件无法获取storageRecordDTO
@@ -266,7 +270,7 @@ public class DocumentServiceImpl implements IDocumentService {
     @Override
     public void updateStatus(String documentId, DocumentStatus status) {
         documentInfoRepository.updateStatusById(documentId, status);
-        log.debug("文档状态已更新 DocumentId={} | Status={}", documentId, status);
+        log.info("document status changed. documentId={} status={}", documentId, status);
     }
 
     @Override
@@ -299,7 +303,7 @@ public class DocumentServiceImpl implements IDocumentService {
                             .build()
             ).getData();
         } catch (Exception e) {
-            log.error("resource 服务注册资源失败 DocumentId={}", documentId, e);
+            log.error("document resource register failed. documentId={}", documentId, e);
             this.updateStatus(documentId, new DocumentStatus(DocumentStatusEnum.REGISTERING_RES_TIMEOUT));
             throw new ServiceException(DocumentError.DOCUMENT_REGISTER_RESOURCE_FAILED, e.getMessage());
         }
@@ -311,6 +315,6 @@ public class DocumentServiceImpl implements IDocumentService {
                 .content(documentContentRepository.findById(documentId).map(DocumentContentEntity::getRawText).orElse(null))
                 .build());
 
-        log.debug("文档已就绪 DocumentId={}", documentId);
+        log.debug("document ready finalized. documentId={} resourceId={}", documentId, resourceId);
     }
 }

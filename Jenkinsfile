@@ -119,6 +119,13 @@ pipeline {
                         }
                     }
                 }
+                stage('AI Asset Service') {
+                    steps {
+                        script {
+                            sh "docker build -t ${DOCKER_REGISTRY}/${PROJECT_NAME}-ai-asset:${IMAGE_TAG} -f Dockerfile --build-arg MODULE_NAME=wisepen-ai-asset-service/wisepen-ai-asset-biz ."
+                        }
+                    }
+                }
                 stage('File Storage Service') {
                     steps {
                         script {

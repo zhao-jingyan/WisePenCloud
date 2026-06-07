@@ -29,7 +29,17 @@ public class SearchController {
 
     private final ISearchQueryService searchQueryService;
 
-    @Operation(summary = "全局全文搜索")
+    @Operation(
+            summary = "全文搜索资源",
+            description = """
+                    - 用途：在当前用户可见范围内跨资源类型检索资源内容和元信息。
+                    - 请求：keyword 为搜索关键字，可为空；scope 指定搜索范围；page 和 size 控制分页。
+                    - 约束：当前用户必须已登录；scope 必须是合法枚举。
+                    - 处理：使用当前用户 ID 和小组角色上下文执行全文搜索，并应用资源可见性过滤与高亮处理；不返回当前用户无权查看的资源。
+                    - 失败：搜索服务执行失败 -> ResourceError.RESOURCE_SEARCH_FAILED。
+                    - 响应：返回分页搜索命中列表和总数。
+                    """
+    )
     @Log(title = "全文搜索", businessType = BusinessType.SELECT, isSaveRequestData = false, isSaveResponseData = false)
     @GetMapping("/globalSearchResources")
     public R<PageR<SearchHitItemResponse>> searchResources(

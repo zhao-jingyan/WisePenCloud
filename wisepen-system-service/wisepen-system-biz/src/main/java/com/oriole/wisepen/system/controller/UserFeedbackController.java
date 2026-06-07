@@ -27,7 +27,17 @@ public class UserFeedbackController {
 
     private final FeedbackService feedbackService;
 
-    @Operation(summary = "提交用户反馈", description = "提交问题报错、功能建议、使用咨询等反馈信息")
+    @Operation(
+            summary = "提交用户反馈",
+            description = """
+                    - 用途：让登录用户提交问题报错、功能建议或使用咨询反馈。
+                    - 请求：content 为反馈正文；type 为反馈类型；contact 和 browser 为可选补充信息。
+                    - 约束：当前用户必须已登录；content 和 type 必须表达有效的反馈内容与反馈类型。
+                    - 处理：创建反馈记录并将状态初始化为 PENDING；不在本接口分派处理人或发送通知。
+                    - 失败：未登录 -> PermissionError.NOT_LOGIN；反馈记录写入发生未处理异常 -> CommonError.INTERNAL_ERROR。
+                    - 响应：成功时返回空结果。
+                    """
+    )
     @CheckLogin
     @PostMapping("/addFeedback")
     public R<Void> createFeedback(@Validated @RequestBody FeedbackRequest feedbackRequest) {

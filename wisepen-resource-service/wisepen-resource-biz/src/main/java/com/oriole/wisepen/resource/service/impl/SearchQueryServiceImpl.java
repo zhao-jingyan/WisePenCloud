@@ -72,7 +72,7 @@ public class SearchQueryServiceImpl implements ISearchQueryService {
         try {
             searchHits = elasticsearchOperations.search(nativeQuery, ESIndexEntity.class, INDEX);
         } catch (Exception e) {
-            log.error("ES search failed keyword={} scope={}", keyword, scope, e);
+            log.error("search query failed. keyword={} scope={}", keyword, scope, e);
             throw new ServiceException(ResourceError.RESOURCE_SEARCH_FAILED);
         }
 
@@ -83,7 +83,8 @@ public class SearchQueryServiceImpl implements ISearchQueryService {
             result.add(toResponse(hit));
         }
 
-        log.info("search ok keyword={} scope={} userId={} total={} page={} size={}", keyword, scope, currentUserId, total, page, size);
+        log.debug("search query succeeded. keyword={} scope={} userId={} total={} page={} size={}",
+                keyword, scope, currentUserId, total, page, size);
         return result;
     }
 

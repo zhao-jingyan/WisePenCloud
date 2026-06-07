@@ -32,11 +32,11 @@ import java.util.List;
 @EnableConfigurationProperties(WisepenOpenApiProperties.class)
 public class WisepenOpenApiAutoConfiguration {
 
-    private static final String SCHEME_FROM_SOURCE = "FromSource";
+//    private static final String SCHEME_FROM_SOURCE = "FromSource";
     private static final String SCHEME_USER_ID = "UserID";
     private static final String SCHEME_IDENTITY_TYPE = "IdentityType";
     private static final String SCHEME_GROUP_ROLE_MAP = "GroupRoleMap";
-    private static final String SCHEME_DEVELOPER = "Developer";
+//    private static final String SCHEME_DEVELOPER = "Developer";
 
     @Bean
     public GlobalOpenApiCustomizer wisepenOpenApiCustomizer(WisepenOpenApiProperties properties, Environment environment) {
@@ -52,8 +52,8 @@ public class WisepenOpenApiAutoConfiguration {
             // SecurityRequirement 表示某一个接口需要满足的一组安全要求
             SecurityRequirement securityRequirement = new SecurityRequirement();
 
-            // 大多数接口都需要 FromSource 用于证明请求来自可信网关
-            securityRequirement.addList(SCHEME_FROM_SOURCE);
+            // 大多数接口都需要 FromSource 用于证明请求来自可信网关（在使用代理时被暂时移除）
+            // securityRequirement.addList(SCHEME_FROM_SOURCE);
 
             // 判断当前接口是否需要用户上下文
             // 如果 Controller 方法或 Controller 类上标注了 @CheckLogin \ @CheckRole 就说明这个接口需要识别当前用户身份
@@ -91,10 +91,17 @@ public class WisepenOpenApiAutoConfiguration {
 
     private void applySecuritySchemes(OpenAPI openApi) {
         Components components = openApi.getComponents() == null ? new Components() : openApi.getComponents();
+        /*
+        // 下列安全头在使用代理时被暂时移除
         components.addSecuritySchemes(SCHEME_FROM_SOURCE, headerScheme(
                 SecurityConstants.HEADER_FROM_SOURCE,
                 "内部来源校验头。直连微服务测试时填写 APISIX 注入的固定来源值。"
         ));
+        components.addSecuritySchemes(SCHEME_DEVELOPER, headerScheme(
+                CommonConstants.GRAY_HEADER_DEV_KEY,
+                "灰度隔离开发者标识。通常由 dev.properties 设置；直连测试时可手工透传。"
+        ));
+        */
         components.addSecuritySchemes(SCHEME_USER_ID, headerScheme(
                 SecurityConstants.HEADER_USER_ID,
                 "当前用户 ID。直连微服务测试 @CheckLogin 接口时手工模拟 APISIX 注入。"
@@ -106,10 +113,6 @@ public class WisepenOpenApiAutoConfiguration {
         components.addSecuritySchemes(SCHEME_GROUP_ROLE_MAP, headerScheme(
                 SecurityConstants.HEADER_GROUP_ROLE_MAP,
                 "当前用户小组角色 JSON，例如 {\"10001\":0}，角色值：0=OWNER，1=ADMIN，2=MEMBER。"
-        ));
-        components.addSecuritySchemes(SCHEME_DEVELOPER, headerScheme(
-                CommonConstants.GRAY_HEADER_DEV_KEY,
-                "灰度隔离开发者标识。通常由 dev.properties 设置；直连测试时可手工透传。"
         ));
         openApi.setComponents(components);
     }
