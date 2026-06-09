@@ -67,9 +67,11 @@ public class FudanUISVerificationStrategy implements UserVerificationStrategy {
                 .build();
         try {
             kafkaTemplate.send(MqTopicConstants.FUDAN_UIS_AUTH_REQ, objectMapper.writeValueAsString(message));
-            log.info("已向 Fudan Extension Service 派发 Fudan UIS 认证请求，userId: {}", userId);
+            log.debug("fudan uis auth publish requested. topic={} userId={}",
+                    MqTopicConstants.FUDAN_UIS_AUTH_REQ, userId);
         } catch (Exception e) {
-            log.error("派发 Fudan UIS 认证请求失败 userId: {}", userId, e);
+            log.error("fudan uis auth publish request failed. topic={} userId={}",
+                    MqTopicConstants.FUDAN_UIS_AUTH_REQ, userId, e);
             throw new ServiceException(UserError.VERIFICATION_FUDAN_UIS_REQUEST_FAILED);
         }
     }
@@ -106,7 +108,8 @@ public class FudanUISVerificationStrategy implements UserVerificationStrategy {
                 .eq(UserEntity::getStatus, Status.NORMAL)
                 .ne(UserEntity::getUserId, userId));
         if (existed > 0) {
-            log.warn("Fudan UIS 认证落库失败：学号 {} 已被其他账号绑定", campusNo);
+            log.warn("fudan uis verify rejected for bound campus number. userId={} campusNo={}",
+                    userId, campusNo);
             throw new ServiceException(UserError.VERIFICATION_CAMPUS_NO_ALREADY_EXISTS);
         }
 
@@ -151,7 +154,7 @@ public class FudanUISVerificationStrategy implements UserVerificationStrategy {
         userProfileEntity.setUserId(userId);
         userProfileMapper.updateById(userProfileEntity);
 
-        log.info("Fudan UIS 认证成功并完成落库 userId: {}, campusNo: {}", userId, campusNo);
+        log.info("fudan uis verify succeeded. userId={} campusNo={}", userId, campusNo);
         return VerificationResultDTO.success();
     }
 

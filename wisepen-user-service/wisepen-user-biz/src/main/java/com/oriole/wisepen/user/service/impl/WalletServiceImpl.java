@@ -194,7 +194,8 @@ public class WalletServiceImpl implements IWalletService {
         GroupEntity group = groupMapper.selectById(groupId);
         if (group != null && group.getTokenBalance() <= 0) {
             redisCacheManager.blockGroupChat(groupId);
-            log.warn("群组 {} 余额已欠费透支，当前余额: {}，已触发熔断", groupId, group.getTokenBalance());
+            log.warn("group chat blocked by token overdraft. groupId={} tokenBalance={}",
+                    groupId, group.getTokenBalance());
         }
     }
 
@@ -221,7 +222,8 @@ public class WalletServiceImpl implements IWalletService {
             tokenBill = groupTokenBalance; // 扣除所有余量
             // 触发组成员熔断
             redisCacheManager.blockGroupMemberChat(groupId, userId);
-            log.warn("用户 {} 在群组 {} 的个人配额已触发熔断", userId, groupId);
+            log.warn("group member chat blocked by quota. groupId={} userId={}",
+                    groupId, userId);
         }
 
         // 联动扣除群组大盘资金池
@@ -261,7 +263,8 @@ public class WalletServiceImpl implements IWalletService {
         UserWalletEntity walletEntity = userWalletsMapper.selectById(userId);
         if (walletEntity != null && walletEntity.getTokenBalance() <= 0) {
             redisCacheManager.blockUserChat(userId);
-            log.warn("用户 {} 余额已欠费透支，当前余额: {}，已触发熔断", userId, walletEntity.getTokenBalance());
+            log.warn("user chat blocked by token overdraft. userId={} tokenBalance={}",
+                    userId, walletEntity.getTokenBalance());
         }
 
         // 记录交易

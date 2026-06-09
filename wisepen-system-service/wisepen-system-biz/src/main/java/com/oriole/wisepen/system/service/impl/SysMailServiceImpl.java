@@ -45,10 +45,11 @@ public class SysMailServiceImpl implements SysMailService {
             helper.setText(mailSendDTO.getContent(), true);
 
             mailSender.send(message);
-            log.info(String.format("Email sent: To=%s, Subject=%s", mailSendDTO.getToEmail(), mailSendDTO.getSubject()));
+            log.info("mail sent. toEmail={} subject={}",
+                    mailSendDTO.getToEmail(), mailSendDTO.getSubject());
         } catch (Exception e) {
-            String err = String.format("Email sending failed: To=%s, Subject=%s, Err=%s", mailSendDTO.getToEmail(), mailSendDTO.getSubject(), e.getMessage());
-            log.error(err, e);
+            log.error("mail send failed. toEmail={} subject={}",
+                    mailSendDTO.getToEmail(), mailSendDTO.getSubject(), e);
             throw new ServiceException(SysError.MAIL_SEND_FAILED);
         }
     }

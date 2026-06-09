@@ -112,7 +112,7 @@ public class WatermarkPreProcessor {
 
             doc.save(hookedPdf);
         }
-        log.debug("水印占位符预埋完成: source={}, hooked={}", source.getName(), hookedPdf.getName());
+        log.debug("watermark hook embedded. source={} hookedPdf={}", source.getName(), hookedPdf.getName());
     }
 
     /**
@@ -218,13 +218,13 @@ public class WatermarkPreProcessor {
         }
         File fontFile = new File(path);
         if (!fontFile.exists()) {
-            log.warn("CJK 字体文件不存在，中文免责声明将跳过: path={}", path);
+            log.warn("cjk font not found. path={}", path);
             return null;
         }
         try (java.io.FileInputStream fis = new java.io.FileInputStream(fontFile)) {
             return PDType0Font.load(doc, fis, true);
         } catch (IOException e) {
-            log.warn("CJK 字体加载失败，中文免责声明将跳过: path={}, error={}", path, e.getMessage());
+            log.warn("cjk font load failed. path={}", path, e);
             return null;
         }
     }
@@ -254,7 +254,7 @@ public class WatermarkPreProcessor {
                 }
             }
         } catch (Exception e) {
-            log.warn("查找 preHookObjNum 失败", e);
+            log.warn("pre hook object number locate failed.", e);
         }
         return 0;
     }

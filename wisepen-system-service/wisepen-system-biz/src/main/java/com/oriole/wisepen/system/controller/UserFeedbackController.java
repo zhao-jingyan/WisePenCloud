@@ -3,7 +3,7 @@ package com.oriole.wisepen.system.controller;
 import com.oriole.wisepen.common.core.context.SecurityContextHolder;
 import com.oriole.wisepen.common.core.domain.R;
 import com.oriole.wisepen.common.security.annotation.CheckLogin;
-import com.oriole.wisepen.system.api.domain.dto.FeedbackRequest;
+import com.oriole.wisepen.system.api.domain.dto.req.FeedbackRequest;
 import com.oriole.wisepen.system.service.FeedbackService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -14,11 +14,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-/**
- * 用户反馈控制器
- *
- * @author Xiong Heng
- */
+
 @Tag(name = "用户反馈", description = "用户提交问题报错、功能建议与使用咨询")
 @RestController
 @RequestMapping("/system/feedback")

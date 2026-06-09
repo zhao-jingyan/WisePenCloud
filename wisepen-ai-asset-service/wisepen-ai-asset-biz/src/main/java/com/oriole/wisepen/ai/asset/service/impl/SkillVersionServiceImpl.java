@@ -111,7 +111,8 @@ public class SkillVersionServiceImpl implements ISkillVersionService {
                         .build()).getData();
             }
             catch (Exception e) {
-                log.warn("存储服务申请上传 URL 失败", e);
+                log.warn("skill asset upload init failed. resourceId={} version={} dependency=storageService",
+                        req.getResourceId(), req.getDraftVersion(), e);
                 throw new ServiceException(SkillError.SKILL_ASSET_UPLOAD_URL_APPLY_FAILED, e.getMessage());
             }
 
@@ -224,8 +225,12 @@ public class SkillVersionServiceImpl implements ISkillVersionService {
     @Override
     @Transactional
     public void publishSkillVersion(SkillVersionPublishRequest req) {
+        SkillEntity skill = skillRepository.findByResourceId(req.getResourceId())
+                .orElseThrow(() -> new ServiceException(SkillError.SKILL_NOT_FOUND));
+
+        int draftVersion = skill.getVersion() + 1;
         // 检查当否是草案版本
-        SkillVersionEntity draft = skillVersionRepository.findByResourceIdAndVersion(req.getResourceId(), req.getDraftVersion())
+        SkillVersionEntity draft = skillVersionRepository.findByResourceIdAndVersion(req.getResourceId(), draftVersion)
                 .orElseThrow(() -> new ServiceException(SkillError.SKILL_VERSION_NOT_FOUND));
         if (draft.getStatus() != SkillVersionStatus.DRAFT) throw new ServiceException(SkillError.CANNOT_OPERATE_NON_DRAFT_SKILL_VERSION);
         // 核心资源缺失
@@ -237,11 +242,12 @@ public class SkillVersionServiceImpl implements ISkillVersionService {
             throw new ServiceException(SkillError.SKILL_ASSET_NOT_READY);
         }
         draft.setStatus(SkillVersionStatus.PUBLISHED);
-        skillRepository.updateVersionByResourceId(req.getResourceId(), req.getDraftVersion());
+        skillRepository.updateVersionByResourceId(req.getResourceId(), draftVersion);
         skillVersionRepository.save(draft);
 
+        eventPublisher.publishSkillPubEvent(skill, draft);
         // 新草案是 version + 1，直接新建
-        createDraftSkillVersion(req.getResourceId(), req.getDraftVersion() + 1);
+        createDraftSkillVersion(req.getResourceId(), draftVersion + 1);
     }
 
     private boolean isSkillDraftUnavailable(SkillAssetInfoBase asset) {
@@ -251,7 +257,6 @@ public class SkillVersionServiceImpl implements ISkillVersionService {
     }
 
     @Override
-    @Transactional
     public void handleFileUploaded(FileUploadedMessage msg) {
         if (msg.getScene() != StorageSceneEnum.PRIVATE_SKILL_ASSET){
             return; // 不处理非PRIVATE_SKILL_ASSET的上传通知
@@ -261,7 +266,7 @@ public class SkillVersionServiceImpl implements ISkillVersionService {
         if (version == null) {
             // 未找到对应的版本，删除文件
             eventPublisher.publishFileDeleteEvent(List.of(msg.getObjectKey()));
-            log.warn("未找到对应Skill版本，已经删除上传的文件 ObjectKey={}", msg.getObjectKey());
+            log.warn("skill asset upload compensated for missing version. objectKey={}", msg.getObjectKey());
             return;
         }
         SkillAssetInfoBase asset = null;
@@ -281,8 +286,9 @@ public class SkillVersionServiceImpl implements ISkillVersionService {
         asset.setSize(msg.getSize());
         asset.setUploadStatus(SkillAssetUploadStatus.AVAILABLE);
         skillVersionRepository.save(version);
-        log.info("skill asset upload callback handled resourceId={} version={} assetId={} objectKey={}",
-                version.getResourceId(), version.getVersion(), asset.getId(), msg.getObjectKey());
+
+        log.info("skill asset upload handled. resourceId={} version={} assetId={} objectKey={}",
+                        version.getResourceId(), version.getVersion(), asset.getId(), msg.getObjectKey());
     }
 
     @Override

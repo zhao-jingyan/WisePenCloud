@@ -103,7 +103,7 @@ public class TagServiceImpl implements ITagService {
         }
 
         TagEntity saved = tagRepository.save(entity);
-        log.info("tag created groupId={} parentId={} tagId={} isPath={}",
+        log.info("tag created. groupId={} parentId={} tagId={} isPath={}",
                 saved.getGroupId(), saved.getParentId(), saved.getTagId(), saved.getIsPath());
         return saved.getTagId();
     }
@@ -139,7 +139,7 @@ public class TagServiceImpl implements ITagService {
             }
 
             if (initialized) {
-                log.info("personalSpace created groupId={} nodes=root,trash", groupId);
+                log.info("personal space created. groupId={} nodes=root,trash", groupId);
             }
         }
 
@@ -209,11 +209,11 @@ public class TagServiceImpl implements ITagService {
 
         tagRepository.save(entity);
 
-        log.info("tag updated groupId={} tagId={} nameChanged={} permissionChanged={}",
+        log.info("tag updated. groupId={} tagId={} nameChanged={} permissionChanged={}",
                 groupID, targetId, nameChanged, isPermissionChanged);
 
         if (isPermissionChanged) {
-            log.info("tagPermission changed groupId={} tagId={} taggedResourceAclGrantScope={} tagMountPermissionScope={}",
+            log.info("tag permission changed. groupId={} tagId={} taggedResourceAclGrantScope={} tagMountPermissionScope={}",
                     groupID, targetId, entity.getTaggedResourceAclGrantScope(), entity.getTagMountPermissionScope());
             // 通知所有挂在它以及它子孙节点上的资源重新计算权限
             // 个人组标签不能设置标签权限，已经提前抛出错误
@@ -322,7 +322,7 @@ public class TagServiceImpl implements ITagService {
 
         // 如果是被移入回收站，触发Tag下所有资源的共享小组剥夺
         if (isNodeInTrash(groupID, newParentId) == TagType.TRASH) {
-            log.info("tag moved groupId={} tagId={} oldParentId={} newParentId={}(trash) descendantCount={}",
+            log.info("tag moved to trash. groupId={} tagId={} oldParentId={} newParentId={} descendantCount={}",
                     groupID, targetId, oldParentId, newParentId, descendants.size());
 
             List<String> affectedTagIds = descendants.stream().map(TagEntity::getTagId).collect(Collectors.toList());
@@ -330,7 +330,7 @@ public class TagServiceImpl implements ITagService {
             // 发布移入回收站事件
             eventPublisher.publishEvent(new TagTrashedEvent(affectedTagIds));
         } else {
-            log.info("tag moved groupId={} tagId={} oldParentId={} newParentId={} descendantCount={}",
+            log.info("tag moved. groupId={} tagId={} oldParentId={} newParentId={} descendantCount={}",
                     groupID, targetId, oldParentId, newParentId, descendants.size());
             // 正常的移动，通知所有挂在它以及它子孙节点上的资源重新计算权限
             afterTagNodeChanged(groupID, targetId, groupID.startsWith(ResourceConstants.PERSONAL_GROUP_PREFIX));
@@ -369,7 +369,7 @@ public class TagServiceImpl implements ITagService {
         tagRepository.deleteByGroupIdAndAncestorsContaining(groupID, targetId);
 
         // 发布彻底删除事件
-        log.info("tag deleted groupId={} tagId={} cascadeCount={} isPath={}",
+        log.info("tag deleted. groupId={} tagId={} cascadeCount={} isPath={}",
                 groupID, targetId, deletedTagIds.size(), targetNode.getIsPath());
         eventPublisher.publishEvent(new TagDeletedEvent(deletedTagIds, groupID.startsWith(ResourceConstants.PERSONAL_GROUP_PREFIX), targetNode.getIsPath()));
     }
@@ -428,7 +428,7 @@ public class TagServiceImpl implements ITagService {
             mongoTemplate.save(tag, TAGS_TRASH_COLLECTION);
         }
         tagRepository.deleteByGroupId(groupId);
-        log.info("tagTree deleted mode=soft groupId={} count={}", groupId, tags.size());
+        log.info("tag tree deleted. mode=soft groupId={} count={}", groupId, tags.size());
     }
 
     public void hardRemoveAllTagByGroupId(String groupId) {
@@ -444,7 +444,7 @@ public class TagServiceImpl implements ITagService {
                 Query.query(Criteria.where("groupId").is(groupId)),
                 TAGS_TRASH_COLLECTION
         ).getDeletedCount();
-        log.info("tagTree deleted mode=hard groupId={} count={} tagIds={}",
+        log.info("tag tree deleted. mode=hard groupId={} count={} tagIds={}",
                 groupId, deletedCount, summarizeIds(allTagIds));
     }
 }

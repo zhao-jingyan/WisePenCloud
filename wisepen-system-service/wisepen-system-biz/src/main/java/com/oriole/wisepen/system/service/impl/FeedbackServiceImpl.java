@@ -1,7 +1,7 @@
 package com.oriole.wisepen.system.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
-import com.oriole.wisepen.system.api.domain.dto.FeedbackRequest;
+import com.oriole.wisepen.system.api.domain.dto.req.FeedbackRequest;
 import com.oriole.wisepen.system.api.enums.FeedbackStatus;
 import com.oriole.wisepen.system.domain.entity.FeedbackEntity;
 import com.oriole.wisepen.system.mapper.FeedbackMapper;

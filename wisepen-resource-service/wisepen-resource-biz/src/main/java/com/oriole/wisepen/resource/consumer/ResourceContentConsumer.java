@@ -22,13 +22,16 @@ public class ResourceContentConsumer {
     private final ObjectMapper objectMapper;
 
     @KafkaListener(topics = TOPIC_DOCUMENT_READY, groupId = "wisepen-document-ready-group")
-    public void onDocumentReady(DocumentReadyMessage message) {
-        log.info("documentReady received topic={} resourceId={} contentLength={}",
+    public void onDocumentReady(DocumentReadyMessage message) throws Exception {
+        log.info("document ready event received. topic={} resourceId={} contentLength={}",
                 TOPIC_DOCUMENT_READY, message.getResourceId(), message.getContent()!=null ? message.getContent().length() : 0);
         try {
             searchSyncService.syncResourceContent(message.getResourceId(), message.getContent());
+            log.debug("document ready event consumed. topic={} resourceId={}",
+                    TOPIC_DOCUMENT_READY, message.getResourceId());
         } catch (Exception e) {
-            log.error("documentReady consume failed topic={} resourceId={}", TOPIC_DOCUMENT_READY, message.getResourceId(), e);
+            log.error("document ready event consumption failed. topic={} resourceId={}", TOPIC_DOCUMENT_READY, message.getResourceId(), e);
+            throw e;
         }
     }
 
@@ -39,16 +42,24 @@ public class ResourceContentConsumer {
                     "value.deserializer=org.apache.kafka.common.serialization.StringDeserializer"
             }
     )
-    public void onSnapshot(String payload) throws JsonProcessingException {
+    public void onSnapshot(String payload) throws Exception {
         // 从非Java微服务（NodeJS）的发布者订阅，使用objectMapper显式转换
         NoteSnapshotMessage msg = objectMapper.readValue(payload, NoteSnapshotMessage.class);
-        log.info("noteSnapshot received topic={} resourceId={} contentLength={}",
+        log.info("note snapshot event received. topic={} resourceId={} contentLength={}",
                 TOPIC_NOTE_SNAPSHOT, msg.getResourceId(), msg.getPlainText()!=null ? msg.getPlainText().length() : 0);
         try {
-            if ("FULL".equals(msg.getType())) searchSyncService.syncResourceContent(msg.getResourceId(), msg.getPlainText());
+            if ("FULL".equals(msg.getType())) {
+                searchSyncService.syncResourceContent(msg.getResourceId(), msg.getPlainText());
+                log.debug("note snapshot event consumed. topic={} resourceId={}",
+                        TOPIC_NOTE_SNAPSHOT, msg.getResourceId());
+            } else {
+                log.info("note snapshot event skipped because type is not FULL. topic={} resourceId={} type={}",
+                        TOPIC_NOTE_SNAPSHOT, msg.getResourceId(), msg.getType());
+            }
 
         } catch (Exception e) {
-            log.error("documentReady consume failed topic={} resourceId={}", TOPIC_NOTE_SNAPSHOT, msg.getResourceId(), e);
+            log.error("note snapshot event consumption failed. topic={} resourceId={}", TOPIC_NOTE_SNAPSHOT, msg.getResourceId(), e);
+            throw e;
         }
     }
 }

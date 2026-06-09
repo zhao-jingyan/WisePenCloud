@@ -41,6 +41,8 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static com.oriole.wisepen.common.core.util.LogIdUtils.summarizeIds;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -69,7 +71,8 @@ public class StorageServiceImpl implements IStorageService {
         String domain = provider.getDomain();
 
         if (existRecord != null) {
-            log.info("触发同源秒传: md5={}, 原文件={}, 新文件={}", req.getMd5(), existRecord.getObjectKey(), newObjectKey);
+            log.info("storage flash upload started. md5={} sourceObjectKey={} targetObjectKey={}",
+                    req.getMd5(), existRecord.getObjectKey(), newObjectKey);
             // 触发 OSS 内部物理克隆
             try {
                 provider.copyObject(existRecord.getObjectKey(), newObjectKey);
@@ -88,6 +91,7 @@ public class StorageServiceImpl implements IStorageService {
             fileUploadedMessage.setFlashUploaded(true);
             // 发送 Kafka 事件
             eventPublisher.publishFileUploadedEvent(fileUploadedMessage);
+            log.info("storage record created. objectKey={} status={} flashUploaded=true", newObjectKey, newRecord.getStatus());
 
             return UploadInitRespDTO.builder()
                     .flashUploaded(true)
@@ -106,6 +110,8 @@ public class StorageServiceImpl implements IStorageService {
                 .build();
         storageRecordMapper.insert(newRecord);
         UploadUrlBase uploadUrl = provider.generateUploadTicket(newObjectKey, storageProperties.getDefaultTicketDuration(), storageProperties.getApiDomain());
+
+        log.info("storage upload ticket created. objectKey={} status={}", newObjectKey, StorageStatusEnum.UPLOADING);
 
         UploadInitRespDTO dto = UploadInitRespDTO.builder()
                 .flashUploaded(false).objectKey(newObjectKey).domain(provider.getDomain())
@@ -130,6 +136,8 @@ public class StorageServiceImpl implements IStorageService {
                 .scene(scene).objectKey(objectKey).size(file.getSize()).configId(provider.getConfigId()).status(StorageStatusEnum.AVAILABLE)
                 .build();
         storageRecordMapper.insert(newRecord);
+
+        log.info("small file uploaded. objectKey={} size={} status={}", objectKey, file.getSize(), StorageStatusEnum.AVAILABLE);
 
         StorageRecordDTO dto = BeanUtil.copyProperties(newRecord, StorageRecordDTO.class);
         dto.setDomain(provider.getDomain());
@@ -170,7 +178,8 @@ public class StorageServiceImpl implements IStorageService {
         if (updateCount == 0) {
             throw new ServiceException(FileStorageError.FILE_RECORD_NOT_FOUND);
         }
-        log.info("执行批量软删除成功，影响行数: {}, objectKeys: {}", updateCount, objectKeys);
+
+        log.info("storage records deleted. mode=soft count={} objectKeys={}", updateCount, summarizeIds(objectKeys));
     }
 
     @Override
@@ -209,7 +218,7 @@ public class StorageServiceImpl implements IStorageService {
         }
 
         if (StorageStatusEnum.AVAILABLE.equals(record.getStatus())) {
-            log.info("文件已处理，忽略重复回调: {}", objectKey);
+            log.debug("storage callback skipped. objectKey={} status={}", objectKey, record.getStatus());
             return;
         }
 
@@ -223,7 +232,8 @@ public class StorageServiceImpl implements IStorageService {
         fileUploadedMessage.setFlashUploaded(false); // 非秒传
 
         eventPublisher.publishFileUploadedEvent(fileUploadedMessage);
-        log.info("云端直传文件回调落库: {}/{}", provider.getDomain(), objectKey);
+
+        log.info("storage callback persisted. objectKey={} domain={} status={}", objectKey, provider.getDomain(), StorageStatusEnum.AVAILABLE);
     }
 
     private String buildObjectKey(String scenePrefix, String bizTag, String extension) {
@@ -264,7 +274,8 @@ public class StorageServiceImpl implements IStorageService {
     @Override
     public StorageRecordDTO compensateStatus(StorageRecordEntity record) {
         StorageProvider provider = storageManager.getProvider(record.getConfigId());
-        log.warn("触发自愈补偿, 正在请求云厂商验证: {}/{}", provider.getDomain(), record.getObjectKey());
+        log.warn("storage record recover started. objectKey={} domain={}",
+                record.getObjectKey(), provider.getDomain());
 
         StorageRecordBase cloudRecord = provider.getObjectMetadata(record.getObjectKey());
         if (cloudRecord != null) {
@@ -283,7 +294,7 @@ public class StorageServiceImpl implements IStorageService {
 
             eventPublisher.publishFileUploadedEvent(fileUploadedMessage);
 
-            log.info("文件状态已更新, 本地处于 AVAILABLE: {}/{}", provider.getDomain(), record.getObjectKey());
+            log.info("storage record recovered. objectKey={} domain={} status={}", record.getObjectKey(), provider.getDomain(), StorageStatusEnum.AVAILABLE);
             return dto;
         }
         return null;

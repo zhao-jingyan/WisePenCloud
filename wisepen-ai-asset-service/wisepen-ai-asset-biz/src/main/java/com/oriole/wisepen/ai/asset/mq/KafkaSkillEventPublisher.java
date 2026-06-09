@@ -1,6 +1,10 @@
 package com.oriole.wisepen.ai.asset.mq;
 
+import cn.hutool.core.bean.BeanUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.oriole.wisepen.ai.asset.domain.base.SkillInfoBase;
+import com.oriole.wisepen.ai.asset.domain.base.SkillVersionBase;
+import com.oriole.wisepen.ai.asset.domain.mq.SkillPublishedMessage;
 import com.oriole.wisepen.common.mq.ReliablePublisher;
 import jakarta.annotation.Resource;
 import lombok.RequiredArgsConstructor;
@@ -9,6 +13,8 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 
+import static com.oriole.wisepen.ai.asset.constant.MqTopicConstants.TOPIC_SKILL_PUBLISHED;
+import static com.oriole.wisepen.common.core.util.LogIdUtils.summarizeIds;
 import static com.oriole.wisepen.file.storage.api.constant.MqTopicConstants.TOPIC_FILE_DELETE;
 
 /**
@@ -28,10 +34,28 @@ public class KafkaSkillEventPublisher {
         try {
             // 发布至兼容非Java微服务的订阅者，统一使用 Jackson 序列化
             String jsonPayload = objectMapper.writeValueAsString(allObjectKeys);
+            int count = allObjectKeys.size();
             reliablePublisher.publish(TOPIC_FILE_DELETE, null, jsonPayload, null);
-            log.debug("成功发布文档删除事件 Document: {}", allObjectKeys);
+            log.debug("file delete event publish requested. topic={} count={} objectKeys={}",
+                    TOPIC_FILE_DELETE, count, summarizeIds(allObjectKeys));
         } catch (Exception e) {
-            log.error("发布文档解析删除失败 Document: {}", allObjectKeys, e);
+            log.error("file delete event publish request failed. topic={} count={} objectKeys={}",
+                    TOPIC_FILE_DELETE, allObjectKeys.size(), summarizeIds(allObjectKeys), e);
+        }
+    }
+
+    public void publishSkillPubEvent(SkillInfoBase skillInfoBase, SkillVersionBase skillVersionBase) {
+        SkillPublishedMessage msg = BeanUtil.copyProperties(skillInfoBase, SkillPublishedMessage.class);
+        msg.setLatestPublishedSkill(skillVersionBase);
+        try {
+            // 发布至非Java微服务的订阅者，统一使用 Jackson 序列化
+            String jsonPayload = objectMapper.writeValueAsString(msg);
+            reliablePublisher.publish(TOPIC_SKILL_PUBLISHED, msg.getResourceId(), jsonPayload, msg.getResourceId());
+            log.debug("skill sync event publish requested. topic={} resourceId={}",
+                    TOPIC_SKILL_PUBLISHED, msg.getResourceId());
+        } catch (Exception e) {
+            log.error("skill sync event publish request failed. topic={} resourceId={}",
+                    TOPIC_SKILL_PUBLISHED, msg.getResourceId(), e);
         }
     }
 }

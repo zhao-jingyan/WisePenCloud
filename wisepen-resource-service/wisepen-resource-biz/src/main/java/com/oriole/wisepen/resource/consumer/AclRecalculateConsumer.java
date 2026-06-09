@@ -23,16 +23,16 @@ public class AclRecalculateConsumer {
 
     @KafkaListener(topics = TOPIC_ACL_RECALC, groupId = "wisepen-resource-acl-recalc-group")
     public void onAclRecalculate(AclRecalculateMessage message) {
-        log.info("aclRecalc received topic={} resourceId={} trigger={}",
+        log.info("acl recalculation event received. topic={} resourceId={} trigger={}",
                 TOPIC_ACL_RECALC, message.getResourceId(), message.getTriggerSource());
         try {
             resourceService.calculateResourceGroupAcl(message.getResourceId())
                     .ifPresent(resourceItemEntity ->
                             searchSyncService.syncResourceMetadata(resourceItemEntity, EnumSet.of(UpsertField.ACL))
                     );
-            log.debug("aclRecalc consumed topic={} resourceId={}", TOPIC_ACL_RECALC, message.getResourceId());
+            log.debug("acl recalculation event consumed. topic={} resourceId={}", TOPIC_ACL_RECALC, message.getResourceId());
         } catch (Exception e) {
-            log.error("aclRecalc consume failed topic={} resourceId={}", TOPIC_ACL_RECALC, message.getResourceId(), e);
+            log.error("acl recalculation event consumption failed. topic={} resourceId={}", TOPIC_ACL_RECALC, message.getResourceId(), e);
             throw e;
         }
     }

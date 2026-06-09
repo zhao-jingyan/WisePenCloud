@@ -54,10 +54,15 @@ public class DocumentConversionAndParseConsumer {
 
     @KafkaListener(topics = TOPIC_DOCUMENT_PARSE, groupId = "wisepen-document-parse-group")
     public void onDocumentParse(DocumentParseTaskMessage msg) {
+        log.info("document parse event received. topic={} documentId={}",
+                TOPIC_DOCUMENT_PARSE, msg.getDocumentId());
         try {
             process(msg);
+            log.debug("document parse event consumed. topic={} documentId={}",
+                    TOPIC_DOCUMENT_PARSE, msg.getDocumentId());
         } catch (Exception e) {
-            log.error("文档解析失败: documentId={}", msg.getDocumentId(), e);
+            log.error("document parse event consumption failed. topic={} documentId={}",
+                    TOPIC_DOCUMENT_PARSE, msg.getDocumentId(), e);
             documentService.updateStatus(msg.getDocumentId(), new DocumentStatus(e.getMessage()));
         }
     }
@@ -66,7 +71,8 @@ public class DocumentConversionAndParseConsumer {
 
         DocumentStatus status = documentService.getDocumentStatus(msg.getDocumentId()).orElse(null);
         if (status != null && status.getStatus() != DocumentStatusEnum.UPLOADED) {
-            log.info("文档处理前置状态异常，跳过解析 DocumentId={}", msg.getDocumentId());
+            log.info("document parse skipped because status mismatched. documentId={} status={}",
+                    msg.getDocumentId(), status.getStatus());
             return;
         }
 
@@ -99,7 +105,8 @@ public class DocumentConversionAndParseConsumer {
 
             documentService.saveConversionAndParseResult(msg.getDocumentId(), previewKey, pdfMeta, content);
             documentService.finalizeToReady(msg.getDocumentId());
-            log.info("文档解析完成 DocumentId={} | PreviewKey={}", msg.getDocumentId(), previewKey);
+            log.info("document parse finished. documentId={} previewObjectKey={}",
+                    msg.getDocumentId(), previewKey);
 
         } finally {
             deleteSilently(sourceFile);
@@ -132,7 +139,8 @@ public class DocumentConversionAndParseConsumer {
                     .build()).getData();
         }
         catch (Exception e) {
-            log.warn("存储服务申请上传 URL 失败", e);
+            log.warn("preview upload init failed. documentId={} dependency=storageService",
+                    documentId, e);
             throw new ServiceException(DocumentError.DOCUMENT_UPLOAD_URL_APPLY_FAILED, e.getMessage());
         }
 
@@ -163,7 +171,7 @@ public class DocumentConversionAndParseConsumer {
             try {
                 Files.deleteIfExists(file.toPath());
             } catch (Exception e) {
-                log.warn("临时文件删除失败 Path={}", file.getAbsolutePath());
+                log.warn("cache file delete failed. path={}", file.getAbsolutePath(), e);
             }
         }
     }

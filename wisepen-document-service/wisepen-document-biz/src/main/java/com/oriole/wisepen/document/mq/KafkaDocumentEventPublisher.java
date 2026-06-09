@@ -1,21 +1,19 @@
 package com.oriole.wisepen.document.mq;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.oriole.wisepen.common.mq.ReliablePublisher;
 import com.oriole.wisepen.document.api.domain.mq.DocumentParseTaskMessage;
 import com.oriole.wisepen.document.api.domain.mq.DocumentReadyMessage;
-import com.oriole.wisepen.file.storage.api.domain.mq.FileUploadedMessage;
 import jakarta.annotation.Resource;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
 
 import static com.oriole.wisepen.document.api.constant.MqTopicConstants.TOPIC_DOCUMENT_PARSE;
 import static com.oriole.wisepen.document.api.constant.MqTopicConstants.TOPIC_DOCUMENT_READY;
+import static com.oriole.wisepen.common.core.util.LogIdUtils.summarizeIds;
 import static com.oriole.wisepen.file.storage.api.constant.MqTopicConstants.TOPIC_FILE_DELETE;
 
 /**
@@ -33,20 +31,26 @@ public class KafkaDocumentEventPublisher {
     // 发布文档解析任务（内部削峰）
     public void publishParseTask(DocumentParseTaskMessage msg) {
         try {
-            reliablePublisher.publish(TOPIC_DOCUMENT_PARSE, msg.getDocumentId(), msg, msg.getDocumentId());
-            log.debug("成功发布文档解析事件 document: {}", msg.getDocumentId());
+            String documentId = msg.getDocumentId();
+            reliablePublisher.publish(TOPIC_DOCUMENT_PARSE, documentId, msg, documentId);
+            log.debug("document parse event publish requested. topic={} documentId={}",
+                    TOPIC_DOCUMENT_PARSE, documentId);
         } catch (Exception e) {
-            log.error("发布文档解析事件失败 document: {}", msg.getDocumentId(), e);
+            log.error("document parse event publish request failed. topic={} documentId={}",
+                    TOPIC_DOCUMENT_PARSE, msg.getDocumentId(), e);
         }
     }
 
     // 发布文档处理就绪事件
     public void publishReadyEvent(DocumentReadyMessage msg) {
         try {
-            reliablePublisher.publish(TOPIC_DOCUMENT_READY, msg.getResourceId(), msg, msg.getResourceId());
-            log.debug("成功发布文档就绪事件 document: {}", msg.getResourceId());
+            String resourceId = msg.getResourceId();
+            reliablePublisher.publish(TOPIC_DOCUMENT_READY, resourceId, msg, resourceId);
+            log.debug("document ready event publish requested. topic={} resourceId={}",
+                    TOPIC_DOCUMENT_READY, resourceId);
         } catch (Exception e) {
-            log.error("发布文档就绪事件失败 document: {}", msg.getResourceId(), e);
+            log.error("document ready event publish request failed. topic={} resourceId={}",
+                    TOPIC_DOCUMENT_READY, msg.getResourceId(), e);
         }
     }
 
@@ -55,10 +59,13 @@ public class KafkaDocumentEventPublisher {
         try {
             // 发布至兼容非Java微服务的订阅者，统一使用 Jackson 序列化
             String jsonPayload = objectMapper.writeValueAsString(allObjectKeys);
+            int count = allObjectKeys.size();
             reliablePublisher.publish(TOPIC_FILE_DELETE, null, jsonPayload, null);
-            log.debug("成功发布文档删除事件 Document: {}", allObjectKeys);
+            log.debug("file delete event publish requested. topic={} count={} objectKeys={}",
+                    TOPIC_FILE_DELETE, count, summarizeIds(allObjectKeys));
         } catch (Exception e) {
-            log.error("发布文档删除事件失败 Document: {}", allObjectKeys, e);
+            log.error("file delete event publish request failed. topic={} count={} objectKeys={}",
+                    TOPIC_FILE_DELETE, allObjectKeys.size(), summarizeIds(allObjectKeys), e);
         }
     }
 }

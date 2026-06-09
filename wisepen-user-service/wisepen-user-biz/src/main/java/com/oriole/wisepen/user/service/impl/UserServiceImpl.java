@@ -124,7 +124,7 @@ public class UserServiceImpl implements IUserService {
                 .selectOne(Wrappers.<UserEntity>lambdaQuery().eq(UserEntity::getUsername, username).last("LIMIT 1"));
 
         if (userEntity == null) {
-            log.warn("重置密码申请：用户名 {} 不存在，流程静默终止", username);
+            log.warn("password reset mail skipped for unknown user. username={}", username);
             return; // 处于安全考虑，不存在也不报错，防止撞库
         } else if (userEntity.getStatus() == Status.UNIDENTIFIED) {
             // 未通过身份认证，不能找回密码
@@ -152,9 +152,10 @@ public class UserServiceImpl implements IUserService {
 
         try {
             remoteMailService.sendMail(mailDTO);
-            log.info("Email sent. username={}, email={}", username, userEntity.getEmail());
+            log.info("password reset mail sent. username={} email={}", username, userEntity.getEmail());
         } catch (Exception e) {
-            log.error("Email sending failed.", e);
+            log.error("password reset mail send failed. username={} email={}",
+                    username, userEntity.getEmail(), e);
             throw new ServiceException(UserError.USER_PASSWORD_RESET_EMAIL_SEND_FAILED);
         }
     }
@@ -185,7 +186,7 @@ public class UserServiceImpl implements IUserService {
         Long userId = req.getUserId();
         updatePasswordByUserId(userId,
                 StrUtil.isBlank(req.getNewPassword()) ? userProperties.getDefaultPassword() : req.getNewPassword());
-        log.info("[管理员] 用户 {} 密码重置成功", userId);
+        log.info("password reset. userId={} mode=admin", userId);
     }
 
     @Override
@@ -196,7 +197,7 @@ public class UserServiceImpl implements IUserService {
         }
 
         updatePasswordByUserId(userId, req.getNewPassword());
-        log.info("用户 {} 密码重置成功", userId);
+        log.info("password reset. userId={} mode=self", userId);
     }
 
     // 修改密码

@@ -1,26 +1,10 @@
 package com.oriole.wisepen.system.api.domain.dto;
 
+import com.oriole.wisepen.system.api.domain.base.SysOperLogBase;
 import lombok.Data;
-import java.io.Serializable;
-import java.time.LocalDateTime;
+import lombok.EqualsAndHashCode;
 
-/**
- * 操作日志 DTO
- * 归属于 System 模块对外暴露的契约
- */
+@EqualsAndHashCode(callSuper = true)
 @Data
-public class SysOperLogDTO implements Serializable {
-    private String title;
-    private Integer businessType;
-    private String method;
-    private String reqMethod;
-    private Long operUserId;
-    private String operUrl;
-    private String operIp;
-    private String operParam;
-    private String jsonResult;
-    private Integer status;
-    private String errorMsg;
-    private LocalDateTime operTime;
-    private Long costTime;
+public class SysOperLogDTO extends SysOperLogBase {
 }

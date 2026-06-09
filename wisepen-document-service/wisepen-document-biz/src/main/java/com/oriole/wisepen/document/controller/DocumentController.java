@@ -2,7 +2,9 @@ package com.oriole.wisepen.document.controller;
 
 import com.oriole.wisepen.common.core.context.SecurityContextHolder;
 import com.oriole.wisepen.common.core.domain.R;
+import com.oriole.wisepen.common.core.domain.enums.BusinessType;
 import com.oriole.wisepen.common.core.exception.ServiceException;
+import com.oriole.wisepen.common.log.annotation.Log;
 import com.oriole.wisepen.common.security.annotation.CheckLogin;
 import com.oriole.wisepen.document.api.domain.base.DocumentInfoBase;
 import com.oriole.wisepen.document.api.domain.base.DocumentStatus;
@@ -55,6 +57,7 @@ public class DocumentController {
                     - 响应：返回 documentId、objectKey、上传凭证信息和是否秒传。
                     """
     )
+    @Log(title = "初始化文档上传", businessType = BusinessType.INSERT)
     @PostMapping("/uploadDoc")
     public R<DocumentUploadInitResponse> uploadDoc(@Valid @RequestBody DocumentUploadInitRequest request) {
         Long uploaderId = SecurityContextHolder.getUserId();

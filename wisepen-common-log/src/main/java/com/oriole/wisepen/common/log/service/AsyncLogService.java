@@ -24,7 +24,7 @@ public class AsyncLogService {
             remoteLogService.saveLog(sysOperLog);
         } catch (Exception e) {
             // 日志服务挂了不能影响主业务，记录个错误日志即可
-            log.error("操作日志远程落库失败: title={}, msg={}", sysOperLog.getTitle(), e.getMessage());
+            log.error("audit log save failed. title={} dependency=remoteLogService", sysOperLog.getTitle(), e);
         }
     }
 }

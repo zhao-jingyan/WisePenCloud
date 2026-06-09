@@ -1,6 +1,5 @@
 package com.oriole.wisepen.common.core.handler;
 
-import cn.hutool.json.JSONUtil;
 import com.oriole.wisepen.common.core.constant.CommonError;
 import com.oriole.wisepen.common.core.domain.IResult;
 import com.oriole.wisepen.common.core.domain.R;
@@ -40,10 +39,12 @@ public class SpringExceptionHandler extends ResponseEntityExceptionHandler {
         IResult result;
         if (status.is4xxClientError()){
             result = CommonError.REQUEST_ERROR;
-            log.warn("请求异常", ex);
+            log.warn("request exception handled. status={} exception={}",
+                    status.value(), ex.getClass().getSimpleName(), ex);
         } else {
             result = CommonError.INTERNAL_ERROR;
-            log.error("系统内部异常 (Spring)", ex);
+            log.error("spring internal error handled. status={} exception={}",
+                    status.value(), ex.getClass().getSimpleName(), ex);
         }
 
         String uri = request.getDescription(false).replace("uri=", "");
@@ -71,7 +72,8 @@ public class SpringExceptionHandler extends ResponseEntityExceptionHandler {
     protected ResponseEntity<Object> handleMethodArgumentNotValid(
             MethodArgumentNotValidException ex, HttpHeaders headers, HttpStatusCode status, WebRequest request) {
         IResult result = CommonError.REQUEST_PARAM_INVALID;
-        log.warn("请求异常 (参数无效)", ex);
+        log.warn("request validation rejected. status={} exception={}",
+                status.value(), ex.getClass().getSimpleName(), ex);
 
         ObjectError error = ex.getBindingResult().getAllErrors().getFirst();
         String constraint = error.getCode();

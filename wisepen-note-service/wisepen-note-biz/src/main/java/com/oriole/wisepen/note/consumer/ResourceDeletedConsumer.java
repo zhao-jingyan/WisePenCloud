@@ -11,6 +11,7 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 import java.util.Map;
 
+import static com.oriole.wisepen.common.core.util.LogIdUtils.summarizeIds;
 import static com.oriole.wisepen.resource.constant.MqTopicConstants.TOPIC_RESOURCE_PHYSICAL_DESTROY;
 
 @Slf4j
@@ -23,12 +24,23 @@ public class ResourceDeletedConsumer {
     @KafkaListener(topics = TOPIC_RESOURCE_PHYSICAL_DESTROY, groupId = "wisepen-resource-physical-destroy-group")
     public void onResourceDeleted(ResourceDeletedMessage message) {
         Map<ResourceType, List<String>> typedMap = message.getTypedResourceIds();
-        // 笔记服务只关心 NOTE 类型的资源
         List<String> noteIds = typedMap.get(ResourceType.NOTE);
-        if (noteIds != null && !noteIds.isEmpty()) {
-            log.info("接收到 Note 资源硬删除事件 resourceIds={}", noteIds.toString());
-            noteService.deleteNotes(noteIds);
-            log.info("已处理 Note 资源硬删除事件 resourceIds={}", noteIds.toString());
+        int count = noteIds == null ? 0 : noteIds.size();
+        log.info("note delete event received. topic={} count={} noteIds={}",
+                TOPIC_RESOURCE_PHYSICAL_DESTROY, count, summarizeIds(noteIds));
+        if (count > 0) {
+            try {
+                noteService.deleteNotes(noteIds);
+                log.debug("note delete event consumed. topic={} count={} noteIds={}",
+                        TOPIC_RESOURCE_PHYSICAL_DESTROY, count, summarizeIds(noteIds));
+            } catch (Exception e) {
+                log.error("note delete event consumption failed. topic={} count={} noteIds={}",
+                        TOPIC_RESOURCE_PHYSICAL_DESTROY, count, summarizeIds(noteIds), e);
+                throw e;
+            }
+        } else {
+            log.info("note delete event skipped because no note resources. topic={}",
+                    TOPIC_RESOURCE_PHYSICAL_DESTROY);
         }
     }
 }

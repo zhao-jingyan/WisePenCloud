@@ -33,7 +33,7 @@ public class ExternalStorageController {
     )
     @PostMapping("/callback/upload")
     public String handleUploadCallback(HttpServletRequest request, @RequestBody(required = false) String rawBody) {
-        log.info("收到 OSS 回调请求, URI: {}", request.getRequestURI());
+        log.info("storage callback received. uri={}", request.getRequestURI());
         storageService.handleUploadCallback(request, rawBody);
         return "{\"Status\":\"OK\"}";
     }

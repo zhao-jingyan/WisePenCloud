@@ -1,6 +1,5 @@
 package com.oriole.wisepen.document.consumer;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.oriole.wisepen.document.api.domain.base.DocumentStatus;
 import com.oriole.wisepen.document.api.domain.mq.DocumentParseTaskMessage;
@@ -11,7 +10,6 @@ import com.oriole.wisepen.document.repository.DocumentInfoRepository;
 import com.oriole.wisepen.document.service.IDocumentService;
 import com.oriole.wisepen.file.storage.api.domain.mq.FileUploadedMessage;
 import com.oriole.wisepen.file.storage.api.enums.StorageSceneEnum;
-import com.oriole.wisepen.file.storage.api.feign.RemoteStorageService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
@@ -32,14 +30,26 @@ public class FileUploadedConsumer {
     private final ObjectMapper objectMapper;
 
     @KafkaListener(topics = TOPIC_FILE_UPLOADED, groupId = "wisepen-document-upload-callback-group")
-    public void onFileUploaded(String payload) throws JsonProcessingException {
+    public void onFileUploaded(String payload) throws Exception {
         // 从兼容非Java微服务的发布者订阅，使用objectMapper显式转换
         FileUploadedMessage msg = objectMapper.readValue(payload, FileUploadedMessage.class);
-        process(msg);
+        log.info("document file upload event received. topic={} objectKey={} scene={}",
+                TOPIC_FILE_UPLOADED, msg.getObjectKey(), msg.getScene());
+        try {
+            process(msg);
+            log.debug("document file upload event consumed. topic={} objectKey={}",
+                    TOPIC_FILE_UPLOADED, msg.getObjectKey());
+        } catch (Exception e) {
+            log.error("document file upload event consumption failed. topic={} objectKey={}",
+                    TOPIC_FILE_UPLOADED, msg.getObjectKey(), e);
+            throw e;
+        }
     }
 
     private void process(FileUploadedMessage msg) {
         if (msg.getScene() != StorageSceneEnum.PRIVATE_DOC || Boolean.TRUE.equals(msg.getFlashUploaded())){
+            log.debug("document file upload event skipped. objectKey={} scene={} flashUploaded={} reason=\"scene mismatch or flash upload\"",
+                    msg.getObjectKey(), msg.getScene(), msg.getFlashUploaded());
             return; // 不处理非PRIVATE_DOC的上传通知，也不处理秒传的
         }
 
@@ -47,12 +57,14 @@ public class FileUploadedConsumer {
         if (entity == null) {
             // 用户已经取消文件处理，删除文档
             eventPublisher.publishFileDeleteEvent(List.of(msg.getObjectKey()));
-            log.warn("未找到对应文档，已经删除上传的文件 objectKey={}", msg.getObjectKey());
+            log.warn("document file upload compensated for missing document. objectKey={}",
+                    msg.getObjectKey());
             return;
         }
 
         if (DocumentStatusEnum.UPLOADING != entity.getDocumentStatus().getStatus()) {
-            log.debug("文档已处理, 跳过 documentId={} status={}", entity.getDocumentId(), entity.getDocumentStatus().getStatus());
+            log.debug("document file upload event skipped. documentId={} objectKey={} reason=\"status mismatch\" status={}",
+                    entity.getDocumentId(), msg.getObjectKey(), entity.getDocumentStatus().getStatus());
             return;
         }
 
@@ -69,6 +81,7 @@ public class FileUploadedConsumer {
                         .fileType(entity.getUploadMeta().getFileType())
                         .build()
         );
-        log.info("文档上传回调处理完成 documentId={}", entity.getDocumentId());
+        log.info("document file upload finished. documentId={} objectKey={} size={}",
+                entity.getDocumentId(), msg.getObjectKey(), msg.getSize());
     }
 }

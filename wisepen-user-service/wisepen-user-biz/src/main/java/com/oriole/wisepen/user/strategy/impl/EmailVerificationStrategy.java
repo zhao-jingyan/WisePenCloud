@@ -48,7 +48,7 @@ public class EmailVerificationStrategy implements UserVerificationStrategy {
         String email = (String)  payload.get("email");
 
         if (StrUtil.isBlank(email) || !email.matches("^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.edu(\\.cn)?$")) {
-            log.warn("邮箱格式错误或非教育邮箱: {}", email);
+            log.warn("email verification skipped. email={} reason=\"invalid edu email\"", email);
             throw new ServiceException(UserError.VERIFICATION_EMAIL_INVALID);
         }
 
@@ -58,7 +58,7 @@ public class EmailVerificationStrategy implements UserVerificationStrategy {
                 .ne(UserEntity::getUserId, userId));
 
         if (existed > 0) {
-            log.warn("发起邮箱验证失败：邮箱 {} 已被其他账号绑定", email);
+            log.warn("email verification skipped. email={} userId={} reason=\"email already bound\"", email, userId);
             throw new ServiceException(UserError.VERIFICATION_EMAIL_ALREADY_EXISTS);
         }
 
@@ -78,9 +78,9 @@ public class EmailVerificationStrategy implements UserVerificationStrategy {
 
         try {
             remoteMailService.sendMail(mailDTO);
-            log.info("Verify email sent. userId={}, email={}", userId, email);
+            log.info("email verification mail sent. userId={} email={}", userId, email);
         } catch (Exception e) {
-            log.error("Verify email sending failed.", e);
+            log.error("email verification mail send failed. userId={} email={}", userId, email, e);
             throw new ServiceException(UserError.VERIFICATION_EMAIL_SEND_FAILED);
         }
     }
@@ -101,7 +101,7 @@ public class EmailVerificationStrategy implements UserVerificationStrategy {
                 .ne(UserEntity::getUserId, userId));
 
         if (existed > 0) {
-            log.warn("邮箱验证回调失败：邮箱 {} 已被其他已验证账号占用，userId={}", email, userId);
+            log.warn("email verification skipped. email={} userId={} reason=\"verified by other user\"", email, userId);
             throw new ServiceException(UserError.VERIFICATION_EMAIL_ALREADY_EXISTS);
         }
 

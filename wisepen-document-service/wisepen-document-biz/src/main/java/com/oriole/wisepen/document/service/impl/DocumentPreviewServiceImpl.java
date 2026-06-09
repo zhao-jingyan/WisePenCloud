@@ -67,7 +67,6 @@ public class DocumentPreviewServiceImpl implements IDocumentPreviewService {
     private static final int PIPE_BUF = 64 * 1024; // 64 KB 管道缓冲区
 
     private final DocumentInfoRepository documentInfoRepository;
-    private final DocumentContentRepository documentContentRepository;
     private final DocumentPdfMetaRepository documentPdfMetaRepository;
 
     private final RemoteStorageService remoteStorageService;
@@ -126,10 +125,10 @@ public class DocumentPreviewServiceImpl implements IDocumentPreviewService {
                         ossUrl, meta, userId, previewTime, response);
             }
         } catch (IOException e) {
-            log.error("文档预览响应写入失败 ResourceId={}", resourceId, e);
+            log.error("document preview response write failed. resourceId={}", resourceId, e);
             throw new ServiceException(DocumentError.DOCUMENT_PREVIEW_FAILED);
         } catch (Exception e) {
-            log.error("文档预览请求处理失败 ResourceId={}", resourceId, e);
+            log.error("document preview request handle failed. resourceId={}", resourceId, e);
             throw new ServiceException(DocumentError.DOCUMENT_PREVIEW_FAILED);
         }
     }

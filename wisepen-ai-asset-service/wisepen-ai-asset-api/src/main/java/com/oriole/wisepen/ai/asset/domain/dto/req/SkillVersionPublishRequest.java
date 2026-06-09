@@ -15,7 +15,4 @@ import lombok.NoArgsConstructor;
 public class SkillVersionPublishRequest {
     @NotBlank(message = SkillValidationMsg.SKILL_ID_NOT_BLANK)
     private String resourceId;
-
-    @NotNull(message = SkillValidationMsg.SKILL_VERSION_NOT_BLANK)
-    private Integer draftVersion;
 }

@@ -38,7 +38,7 @@ public class StorageManager {
      */
     @PostConstruct
     public synchronized void init() {
-        log.info("正在从数据库加载存储实例配置...");
+        log.info("storage provider load started. task=storageManagerInit");
         // 销毁旧实例
         destroyAll();
 
@@ -55,14 +55,18 @@ public class StorageManager {
                     this.primaryConfigId = config.getId();
                 }
             } catch (Exception e) {
-                log.error("初始化存储源失败, ConfigId: {}", config.getId(), e);
+                log.error("storage provider init failed. configId={} provider={}",
+                        config.getId(), config.getProvider(), e);
             }
         }
 
         if (this.primaryConfigId == null && !providerCache.isEmpty()) {
-            log.warn("未设置首要存储源，默认使用第一个启用的配置");
             this.primaryConfigId = providerCache.keySet().iterator().next();
+            log.warn("primary storage provider degraded. primaryConfigId={}",
+                    this.primaryConfigId);
         }
+        log.info("storage provider load finished. task=storageManagerInit providerCount={} primaryConfigId={}",
+                providerCache.size(), primaryConfigId);
     }
 
     /**
@@ -124,7 +128,9 @@ public class StorageManager {
 
     @PreDestroy
     public void destroyAll() {
+        int providerCount = providerCache.size();
         providerCache.values().forEach(StorageProvider::destroy);
         providerCache.clear();
+        log.info("storage provider destroyed. providerCount={}", providerCount);
     }
 }

@@ -31,9 +31,9 @@ public class KafkaResourceEventPublisherImpl implements IResourceEventPublisher 
                 .resourceId(resourceId)
                 .triggerSource(triggerSource)
                 .build();
-        log.debug("aclRecalc published topic={} resourceId={} trigger={}",
-                TOPIC_ACL_RECALC, resourceId, triggerSource);
         reliablePublisher.publish(TOPIC_ACL_RECALC, resourceId, msg, resourceId);
+        log.debug("acl recalculation event publish requested. topic={} resourceId={} trigger={}",
+                TOPIC_ACL_RECALC, resourceId, triggerSource);
     }
 
     @Override
@@ -50,8 +50,9 @@ public class KafkaResourceEventPublisherImpl implements IResourceEventPublisher 
                 ));
         ResourceDeletedMessage message = ResourceDeletedMessage.builder().typedResourceIds(typedResourceIds).build();
         String dedupKey = Integer.toHexString(resourceIds.stream().sorted().collect(Collectors.joining(",")).hashCode());
-        log.info("resourcePhysicalDestroy published topic={} resourceCount={} dedupKey={}",
-                MqTopicConstants.TOPIC_RESOURCE_PHYSICAL_DESTROY, resourceIds.size(), dedupKey);
+        int resourceCount = resourceIds.size();
         reliablePublisher.publish(MqTopicConstants.TOPIC_RESOURCE_PHYSICAL_DESTROY, dedupKey, message, dedupKey);
+        log.info("resource physical destroy event publish requested. topic={} resourceCount={} dedupKey={}",
+                MqTopicConstants.TOPIC_RESOURCE_PHYSICAL_DESTROY, resourceCount, dedupKey);
     }
 }

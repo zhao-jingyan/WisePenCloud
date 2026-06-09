@@ -11,6 +11,7 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 import java.util.Map;
 
+import static com.oriole.wisepen.common.core.util.LogIdUtils.summarizeIds;
 import static com.oriole.wisepen.resource.constant.MqTopicConstants.TOPIC_RESOURCE_PHYSICAL_DESTROY;
 
 @Slf4j
@@ -24,10 +25,22 @@ public class ResourceDeletedConsumer {
     public void onResourceDeleted(ResourceDeletedMessage message) {
         Map<ResourceType, List<String>> typedMap = message.getTypedResourceIds();
         List<String> skillIds = typedMap.get(ResourceType.SKILL);
-        if (skillIds != null && !skillIds.isEmpty()) {
-            log.info("接收到 Skill 资源硬删除事件 skillIds={}", skillIds);
-            skillService.deleteSkills(skillIds);
-            log.info("已处理 Skill 资源硬删除事件 skillIds={}", skillIds);
+        int count = skillIds == null ? 0 : skillIds.size();
+        log.info("skill resource delete event received. topic={} count={} skillIds={}",
+                TOPIC_RESOURCE_PHYSICAL_DESTROY, count, summarizeIds(skillIds));
+        if (count > 0) {
+            try {
+                skillService.deleteSkills(skillIds);
+                log.debug("skill resource delete event consumed. topic={} count={} skillIds={}",
+                        TOPIC_RESOURCE_PHYSICAL_DESTROY, count, summarizeIds(skillIds));
+            } catch (Exception e) {
+                log.error("skill resource delete event consumption failed. topic={} count={} skillIds={}",
+                        TOPIC_RESOURCE_PHYSICAL_DESTROY, count, summarizeIds(skillIds), e);
+                throw e;
+            }
+        } else {
+            log.debug("skill resource delete event skipped because no skill resources. topic={}",
+                    TOPIC_RESOURCE_PHYSICAL_DESTROY);
         }
     }
 }
