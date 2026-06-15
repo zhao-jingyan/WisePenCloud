@@ -2,7 +2,6 @@ package com.oriole.wisepen.ai.asset.domain.dto.req;
 
 import com.oriole.wisepen.ai.asset.constant.AIAssetValidationMsg;
 import com.oriole.wisepen.ai.asset.enums.AssetResourceType;
-import com.oriole.wisepen.common.core.domain.IBusinessSubject;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
@@ -42,7 +41,7 @@ public class AssetUploadInitRequest {
         private String path;
 
         @NotNull(message = AIAssetValidationMsg.ASSET_TYPE_NOT_BLANK)
-        private AssetResourceType skillAssetResourceType;
+        private AssetResourceType assetResourceType;
 
         private String md5;
 
