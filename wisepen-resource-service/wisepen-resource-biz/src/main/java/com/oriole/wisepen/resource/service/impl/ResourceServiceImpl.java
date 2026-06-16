@@ -10,6 +10,8 @@ import com.oriole.wisepen.common.core.exception.ServiceException;
 import com.oriole.wisepen.resource.constant.ResourceConstants;
 import com.oriole.wisepen.resource.domain.ComputedGroupAcl;
 import com.oriole.wisepen.resource.domain.GroupTagBind;
+import com.oriole.wisepen.resource.domain.MarketOfferInfo;
+import com.oriole.wisepen.resource.domain.MarketOfferOptions;
 import com.oriole.wisepen.resource.domain.dto.*;
 import com.oriole.wisepen.resource.domain.dto.req.ResourceRenameRequest;
 import com.oriole.wisepen.resource.domain.dto.req.ResourceUpdateActionPermissionRequest;
@@ -208,7 +210,11 @@ public class ResourceServiceImpl implements IResourceService {
     public void updateGroupResourceTags(String resourceId, String groupId, String userId, GroupRoleType groupRole, List<String> tagIds) {
         ResourceItemEntity entity = resourceItemRepository.findById(resourceId)
                 .orElseThrow(() -> new ServiceException(ResourceError.RESOURCE_NOT_FOUND));
+        updateGroupResourceTags(entity, groupId, userId, groupRole, tagIds);
+    }
 
+    @Override
+    public void updateGroupResourceTags(ResourceItemEntity entity, String groupId, String userId, GroupRoleType groupRole, List<String> tagIds) {
         if (tagIds != null && !tagIds.isEmpty()) {
             // 查找并检查Tag
             List<TagEntity> validTags = findAndValidateTags(groupId, tagIds);
@@ -332,7 +338,7 @@ public class ResourceServiceImpl implements IResourceService {
                 currentUserId, groupId, userGroupRole, tagIds, excludeTrashIds, tagQueryLogicMode, resourceType, pageable);
 
         // 批量组装 ResourceItemResponse（不需要再权限过滤）
-        List<ResourceItemResponse> responses = resourceItemResponseAssembler.assembleMany(entityPage.getContent(), currentUserId, groupRoles, List.of());
+        List<ResourceItemResponse> responses = resourceItemResponseAssembler.assembleMany(entityPage.getContent(), currentUserId, groupRoles, List.of(), groupId);
 
         if (groupId != null) {
             // 过滤非检索groupId的标签
@@ -345,7 +351,6 @@ public class ResourceServiceImpl implements IResourceService {
         pageR.addAll(responses);
         return pageR;
     }
-
 
     @Override
     public String createResourceItem(ResourceCreateReqDTO dto) {
@@ -518,9 +523,21 @@ public class ResourceServiceImpl implements IResourceService {
                             groupBind.getTagIds().removeAll(deletedTagIds);
                         }
 
-                        // 如果移除后，该组下没有任何 Tag 了，清理空组
+                        // 如果移除后该组下没有任何 Tag，普通组清理空组；集市组保留 offer 历史但下架。
                         if (groupBind.getTagIds() == null || groupBind.getTagIds().isEmpty()) {
-                            iterator.remove();
+                            if (groupBind.getMarketOffers() == null) {
+                                iterator.remove();
+                            } else {
+                                MarketOfferOptions offers = groupBind.getMarketOffers();
+                                MarketOfferInfo forkOnce = offers.getForkOnce();
+                                if (forkOnce != null && forkOnce.getStatus() != MarketOfferStatus.BANNED) {
+                                    forkOnce.setStatus(MarketOfferStatus.OFF_SHELF);
+                                }
+                                MarketOfferInfo forkUnlimited = offers.getForkUnlimited();
+                                if (forkUnlimited != null && forkUnlimited.getStatus() != MarketOfferStatus.BANNED) {
+                                    forkUnlimited.setStatus(MarketOfferStatus.OFF_SHELF);
+                                }
+                            }
                         }
                     }
                 }
@@ -678,6 +695,7 @@ public class ResourceServiceImpl implements IResourceService {
         Set<String> permissionSources = new HashSet<>();
         // 计算群组权限
         for (GroupTagBind groupBind : entity.getGroupBinds()) {         // 遍历资源绑定的所有组
+            if (groupBind.getTagIds() == null || groupBind.getTagIds().isEmpty()) continue;
             if (groupBind.getGroupId().startsWith(ResourceConstants.PERSONAL_GROUP_PREFIX)) continue; // 个人Tag不参与计算
             Long groupId = Long.valueOf(groupBind.getGroupId());
 

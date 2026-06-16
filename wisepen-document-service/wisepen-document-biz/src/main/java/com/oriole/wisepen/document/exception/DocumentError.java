@@ -22,6 +22,7 @@ public enum DocumentError implements IResult {
     DOCUMENT_UPLOAD_URL_APPLY_FAILED(6141, new ResultKey(BusinessDomain.DOCUMENT, DocumentSubject.DOCUMENT, ErrorReason.FAILED),"申请文档上传 URL 失败"),
     DOCUMENT_STORAGE_STATUS_GET_FAILED(6142, new ResultKey(BusinessDomain.DOCUMENT, DocumentSubject.DOCUMENT, ErrorReason.FAILED),"获取文档存储文件状态失败"),
     DOCUMENT_REGISTER_RESOURCE_FAILED(6143, new ResultKey(BusinessDomain.DOCUMENT, DocumentSubject.DOCUMENT, ErrorReason.FAILED),"注册文档资源失败"),
+    DOCUMENT_FORK_FAILED(6144, new ResultKey(BusinessDomain.DOCUMENT, DocumentSubject.DOCUMENT, ErrorReason.FAILED),"文档复制失败"),
 
     // 文档预览相关异常
     DOCUMENT_PREVIEW_NOT_READY(6211, new ResultKey(BusinessDomain.DOCUMENT, DocumentSubject.DOCUMENT_PREVIEW, ErrorReason.STATE_INVALID),"文档尚未就绪，不能预览"),

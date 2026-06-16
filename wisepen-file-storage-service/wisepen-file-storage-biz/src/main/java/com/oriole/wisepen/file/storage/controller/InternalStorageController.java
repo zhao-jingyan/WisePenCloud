@@ -1,6 +1,7 @@
 package com.oriole.wisepen.file.storage.controller;
 
 import com.oriole.wisepen.common.core.domain.R;
+import com.oriole.wisepen.file.storage.api.domain.dto.StorageCopyRequest;
 import com.oriole.wisepen.file.storage.api.domain.dto.StorageRecordDTO;
 import com.oriole.wisepen.file.storage.api.domain.dto.UploadInitReqDTO;
 import com.oriole.wisepen.file.storage.api.domain.dto.StsTokenDTO;
@@ -40,6 +41,14 @@ public class InternalStorageController {
     @PostMapping("/initUpload")
     public R<UploadInitRespDTO> initUpload(@Validated @RequestBody UploadInitReqDTO req) {
         return R.ok(storageService.initUpload(req));
+    }
+
+    /**
+     * 复制已有文件对象并生成独立存储记录
+     */
+    @PostMapping("/copyObject")
+    public R<StorageRecordDTO> copyObject(@Validated @RequestBody StorageCopyRequest req) {
+        return R.ok(storageService.copyObject(req));
     }
 
     /**

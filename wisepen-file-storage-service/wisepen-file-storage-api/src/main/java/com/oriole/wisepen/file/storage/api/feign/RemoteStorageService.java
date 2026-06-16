@@ -1,6 +1,7 @@
 package com.oriole.wisepen.file.storage.api.feign;
 
 import com.oriole.wisepen.common.core.domain.R;
+import com.oriole.wisepen.file.storage.api.domain.dto.StorageCopyRequest;
 import com.oriole.wisepen.file.storage.api.domain.dto.StorageRecordDTO;
 import com.oriole.wisepen.file.storage.api.domain.dto.StsTokenDTO;
 import com.oriole.wisepen.file.storage.api.domain.dto.UploadInitReqDTO;
@@ -23,6 +24,12 @@ public interface RemoteStorageService {
      */
     @PostMapping("/initUpload")
     R<UploadInitRespDTO> initUpload(@RequestBody UploadInitReqDTO req);
+
+    /**
+     * 复制已有文件对象并生成独立存储记录
+     */
+    @PostMapping("/copyObject")
+    R<StorageRecordDTO> copyObject(@RequestBody StorageCopyRequest req);
 
     /**
      * 获取单文件的防盗链下载 URL

@@ -27,6 +27,8 @@ public interface IResourceService {
 
     void updateGroupResourceTags(String resourceId, String groupId, String userId, GroupRoleType groupRole, List<String> tagIds);
 
+    void updateGroupResourceTags(ResourceItemEntity resource, String groupId, String userId, GroupRoleType groupRole, List<String> tagIds);
+
     void updateResourceActionPermission(ResourceUpdateActionPermissionRequest req);
 
     PageR<ResourceItemResponse> listResources(String currentUserId,

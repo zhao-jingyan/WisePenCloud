@@ -16,6 +16,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -46,7 +47,7 @@ public class InternalController implements RemoteUserService, RemoteWalletServic
                     """
     )
     @GetMapping("/user/getUserDisplayInfo")
-    public R<Map<Long, UserDisplayBase>> getUserDisplayInfo(List<Long> userIds) {
+    public R<Map<Long, UserDisplayBase>> getUserDisplayInfo(@RequestParam("userId") List<Long> userIds) {
         return R.ok(userService.getUserDisplayInfoByIds(new HashSet<>(userIds)));
     }
 
@@ -63,10 +64,9 @@ public class InternalController implements RemoteUserService, RemoteWalletServic
                     """
     )
     @GetMapping("/group/getGroupDisplayInfo")
-    public R<Map<Long, GroupDisplayBase>> getGroupDisplayInfo(List<Long> groupIds) {
+    public R<Map<Long, GroupDisplayBase>> getGroupDisplayInfo(@RequestParam("groupId") List<Long> groupIds) {
         return R.ok(groupService.getGroupDisplayInfoByIds(new HashSet<>(groupIds)));
     }
-
 
     @Override
     @Operation(

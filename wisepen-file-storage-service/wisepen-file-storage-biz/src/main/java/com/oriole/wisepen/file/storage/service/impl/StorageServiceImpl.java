@@ -12,6 +12,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.oriole.wisepen.common.core.exception.ServiceException;
 import com.oriole.wisepen.file.storage.api.domain.base.StorageRecordBase;
 import com.oriole.wisepen.file.storage.api.domain.base.UploadUrlBase;
+import com.oriole.wisepen.file.storage.api.domain.dto.StorageCopyRequest;
 import com.oriole.wisepen.file.storage.api.domain.dto.StorageRecordDTO;
 import com.oriole.wisepen.file.storage.api.domain.dto.UploadInitReqDTO;
 import com.oriole.wisepen.file.storage.api.domain.dto.StsTokenDTO;
@@ -102,6 +103,56 @@ public class StorageServiceImpl implements IStorageService {
 
         // 没命中秒传，获取直传 PUT URL
         return this.getPutUrl(req.getScene(), newObjectKey, provider);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public StorageRecordDTO copyObject(StorageCopyRequest req) {
+        StorageRecordEntity sourceRecord = storageRecordMapper.selectOne(
+                Wrappers.<StorageRecordEntity>lambdaQuery()
+                        .eq(StorageRecordEntity::getObjectKey, req.getSourceObjectKey())
+                        .ne(StorageRecordEntity::getStatus, StorageStatusEnum.DELETED)
+                        .last("LIMIT 1")
+        );
+        if (sourceRecord == null) {
+            throw new ServiceException(FileStorageError.FILE_RECORD_NOT_FOUND);
+        }
+        if (!StorageStatusEnum.AVAILABLE.equals(sourceRecord.getStatus())) {
+            StorageRecordDTO compensated = this.compensateStatus(sourceRecord);
+            if (compensated == null) {
+                throw new ServiceException(FileStorageError.FILE_RECORD_NOT_FOUND);
+            }
+            sourceRecord = storageRecordMapper.selectById(compensated.getFileId());
+        }
+
+        StorageProvider provider = storageManager.getProvider(sourceRecord.getConfigId());
+        String extension = FileUtil.extName(sourceRecord.getObjectKey()).toLowerCase();
+        String targetObjectKey = buildObjectKey(req.getScene().getPrefix(), req.getBizTag(), extension);
+
+        try {
+            provider.copyObject(sourceRecord.getObjectKey(), targetObjectKey);
+
+            StorageRecordEntity targetRecord = StorageRecordEntity.builder()
+                    .objectKey(targetObjectKey)
+                    .md5(sourceRecord.getMd5())
+                    .size(sourceRecord.getSize())
+                    .configId(sourceRecord.getConfigId())
+                    .status(StorageStatusEnum.AVAILABLE)
+                    .scene(req.getScene())
+                    .build();
+            storageRecordMapper.insert(targetRecord);
+
+            StorageRecordDTO dto = BeanUtil.copyProperties(targetRecord, StorageRecordDTO.class);
+            dto.setDomain(provider.getDomain());
+            return dto;
+        } catch (Exception e) {
+            try {
+                provider.deleteObject(targetObjectKey);
+            } catch (Exception cleanupEx) {
+                log.warn("复制文件落库失败后清理 OSS 对象失败 objectKey={}", targetObjectKey, cleanupEx);
+            }
+            throw e;
+        }
     }
 
     private UploadInitRespDTO getPutUrl(StorageSceneEnum scene, String newObjectKey, StorageProvider provider) {

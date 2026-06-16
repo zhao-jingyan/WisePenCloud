@@ -5,10 +5,15 @@ import com.oriole.wisepen.common.core.domain.enums.GroupRoleType;
 import com.oriole.wisepen.resource.constant.ResourceConstants;
 import com.oriole.wisepen.resource.domain.ComputedGroupAcl;
 import com.oriole.wisepen.resource.domain.GroupTagBind;
+import com.oriole.wisepen.resource.domain.MarketOfferInfo;
+import com.oriole.wisepen.resource.domain.MarketOfferOptions;
 import com.oriole.wisepen.resource.domain.base.TagInfoBase;
+import com.oriole.wisepen.resource.domain.dto.res.MarketOfferInfoResponse;
+import com.oriole.wisepen.resource.domain.dto.res.MarketOfferOptionsResponse;
 import com.oriole.wisepen.resource.domain.dto.res.ResourceItemResponse;
 import com.oriole.wisepen.resource.domain.entity.ResourceItemEntity;
 import com.oriole.wisepen.resource.domain.entity.TagEntity;
+import com.oriole.wisepen.resource.enums.MarketOfferStatus;
 import com.oriole.wisepen.resource.enums.ResourceAccessRole;
 import com.oriole.wisepen.resource.enums.ResourceAction;
 import com.oriole.wisepen.resource.repository.TagRepository;
@@ -39,6 +44,11 @@ public class ResourceItemResponseAssembler {
     }
 
     public List<ResourceItemResponse> assembleMany(List<ResourceItemEntity> entities, String currentUserId, Map<Long, GroupRoleType> groupRoles, List<ResourceAction> requiredResourceActions) {
+        return assembleMany(entities, currentUserId, groupRoles, requiredResourceActions, null);
+    }
+
+    public List<ResourceItemResponse> assembleMany(List<ResourceItemEntity> entities, String currentUserId, Map<Long, GroupRoleType> groupRoles,
+                                                   List<ResourceAction> requiredResourceActions, String visibleMarketGroupId) {
         if (entities == null || entities.isEmpty()) {
             return Collections.emptyList();
         }
@@ -68,6 +78,8 @@ public class ResourceItemResponseAssembler {
             response.setOwnerInfo(resolveOwnerInfo(entity, ownerInfoMap));
             // 解析 CurrentTags
             response.setCurrentTags(resolveCurrentTags(resourcesTagIdsMap.getOrDefault(entity.getResourceId(), Collections.emptyList()), tagInfosMap));
+            // 仅在明确的集市组上下文下解析上架权益
+            response.setMarketOffers(resolveVisibleMarketOffers(entity, visibleMarketGroupId, currentUserId, groupRoles));
 
             // 仅所有者有此字段
             if (currentUserId.equals(entity.getOwnerId())) {
@@ -201,6 +213,45 @@ public class ResourceItemResponseAssembler {
             groupActionsMask = entity.getOverrideGrantedActionsMask() == null ? groupActionsMask : entity.getOverrideGrantedActionsMask();
         }
         return new ResolvedResourceAccess(groupResourceAccessRole, permissionSources, groupActionsMask);
+    }
+
+    private MarketOfferOptionsResponse resolveVisibleMarketOffers(ResourceItemEntity entity, String groupId,
+                                                                  String currentUserId, Map<Long, GroupRoleType> groupRoles) {
+        if (!StringUtils.hasText(groupId) || entity.getGroupBinds() == null) {
+            return null;
+        }
+        GroupTagBind marketBind = entity.getGroupBinds().stream()
+                .filter(bind -> groupId.equals(bind.getGroupId()))
+                .findFirst()
+                .orElse(null);
+        if (marketBind == null || marketBind.getMarketOffers() == null) {
+            return null;
+        }
+
+        boolean isOwner = currentUserId.equals(entity.getOwnerId());
+        GroupRoleType groupRole = null;
+        if (groupRoles != null && !groupId.startsWith(ResourceConstants.PERSONAL_GROUP_PREFIX)) {
+            groupRole = groupRoles.get(Long.valueOf(groupId));
+        }
+        boolean isGroupAdmin = groupRole == GroupRoleType.ADMIN || groupRole == GroupRoleType.OWNER;
+        MarketOfferOptions offers = marketBind.getMarketOffers();
+        MarketOfferInfoResponse forkOnce = null;
+        MarketOfferInfo forkOnceOffer = offers.getForkOnce();
+        if (forkOnceOffer != null && (isOwner || isGroupAdmin || forkOnceOffer.getStatus() == MarketOfferStatus.PUBLISHED)) {
+            forkOnce = BeanUtil.copyProperties(forkOnceOffer, MarketOfferInfoResponse.class);
+        }
+        MarketOfferInfoResponse forkUnlimited = null;
+        MarketOfferInfo forkUnlimitedOffer = offers.getForkUnlimited();
+        if (forkUnlimitedOffer != null && (isOwner || isGroupAdmin || forkUnlimitedOffer.getStatus() == MarketOfferStatus.PUBLISHED)) {
+            forkUnlimited = BeanUtil.copyProperties(forkUnlimitedOffer, MarketOfferInfoResponse.class);
+        }
+        if (forkOnce == null && forkUnlimited == null) {
+            return null;
+        }
+        MarketOfferOptionsResponse response = new MarketOfferOptionsResponse();
+        response.setForkOnce(forkOnce);
+        response.setForkUnlimited(forkUnlimited);
+        return response;
     }
 
     private UserDisplayBase resolveOwnerInfo(ResourceItemEntity entity, Map<Long, UserDisplayBase> ownerInfoMap) {

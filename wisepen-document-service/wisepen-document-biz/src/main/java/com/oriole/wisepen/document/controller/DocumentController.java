@@ -172,7 +172,7 @@ public class DocumentController {
                     """
     )
     @GetMapping("/getDocInfo")
-    public R<DocumentInfoResponse> getNoteInfo(@RequestParam String resourceId) {
+    public R<DocumentInfoResponse> getDocumentInfo(@RequestParam String resourceId) {
         // 若无权限将抛出异常，此处无需重复鉴权
         ResourceItemResponse resourceInfo = remoteResourceService.getResourceInfo(new ResourceInfoGetReqDTO(
                 resourceId, SecurityContextHolder.getUserId(), SecurityContextHolder.getGroupRoleMap()

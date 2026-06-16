@@ -28,6 +28,16 @@ public interface ResourceValidationMsg {
     // 互动相关校验
     String SCORE_RANGE_INVALID = "评分必须在1到5之间";
 
+    // Market 相关校验
+    String MARKET_PRICE_NOT_NULL = "价格不能为空";
+    String MARKET_PRICE_INVALID = "价格必须大于0";
+    String MARKET_OFFER_OPTION_REQUIRED = "至少需要填写一种购买权益价格";
+    String MARKET_VERSION_NOT_NULL = "上架版本不能为空";
+    String MARKET_VERSION_INVALID = "上架版本必须大于0";
+    String MARKET_PURCHASE_TYPE_NOT_NULL = "购买权益类型不能为空";
+
+    String MARKET_OFFER_STATUS_NOT_NULL = "目标状态不能为空";
+
     // 收藏相关校验
     String COLLECTION_ID_NOT_BLANK = "收藏集合ID不能为空";
     String COLLECTION_NAME_NOT_BLANK = "收藏集合名称不能为空";

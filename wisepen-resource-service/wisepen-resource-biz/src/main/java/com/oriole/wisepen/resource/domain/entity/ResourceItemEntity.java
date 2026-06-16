@@ -2,7 +2,6 @@ package com.oriole.wisepen.resource.domain.entity;
 
 import com.oriole.wisepen.resource.domain.ComputedGroupAcl;
 import com.oriole.wisepen.resource.domain.GroupTagBind;
-import com.oriole.wisepen.resource.domain.base.ResourceInteractionInfoBase;
 import com.oriole.wisepen.resource.domain.base.ResourceItemInfoBase;
 import lombok.*;
 import org.springframework.data.annotation.CreatedDate;
