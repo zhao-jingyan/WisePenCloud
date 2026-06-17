@@ -71,11 +71,6 @@ public class CustomResourceItemRepository {
                     Criteria.where("specifiedUsersGrantedActionsMask." + userId).bits().allSet(discoverCode);
             Criteria specifiedUserMissingCriteria =
                     Criteria.where("specifiedUsersGrantedActionsMask." + userId).exists(false);
-            Criteria overrideAllowsDiscoverCriteria = new Criteria().orOperator(
-                    Criteria.where("overrideGrantedActionsMask").exists(false),
-                    Criteria.where("overrideGrantedActionsMask").is(null),
-                    Criteria.where("overrideGrantedActionsMask").bits().allSet(discoverCode)
-            );
             Criteria groupAclAllowsDiscoverCriteria = new Criteria().orOperator(
                     // 用户被分配了专属掩码，且掩码中包含 DISCOVER
                     Criteria.where(aclPrefix + ".userMasks." + userId).bits().allSet(discoverCode),
@@ -87,7 +82,6 @@ public class CustomResourceItemRepository {
             );
             Criteria groupAclBranchCriteria = new Criteria().andOperator(
                     specifiedUserMissingCriteria,
-                    overrideAllowsDiscoverCriteria,
                     groupAclAllowsDiscoverCriteria
             );
             Criteria aclCriteria = new Criteria().orOperator(

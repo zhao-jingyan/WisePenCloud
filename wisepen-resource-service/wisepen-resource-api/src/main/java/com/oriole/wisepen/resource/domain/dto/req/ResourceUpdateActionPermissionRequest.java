@@ -13,6 +13,6 @@ public class ResourceUpdateActionPermissionRequest {
     @NotBlank(message = ResourceValidationMsg.RESOURCE_ID_NOT_BLANK)
     private String resourceId;
 
-    private List<ResourceAction> overrideGrantedActions;
+    private Map<String, List<ResourceAction>> overrideGrantedActions;
     private Map<String, List<ResourceAction>> specifiedUsersGrantedActions;
 }

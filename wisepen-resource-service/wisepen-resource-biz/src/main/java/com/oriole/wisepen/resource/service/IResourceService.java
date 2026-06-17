@@ -4,11 +4,14 @@ import com.oriole.wisepen.common.core.domain.PageR;
 import com.oriole.wisepen.common.core.domain.enums.GroupRoleType;
 import com.oriole.wisepen.common.core.domain.enums.list.QueryLogicEnum;
 import com.oriole.wisepen.common.core.domain.enums.list.SortDirectionEnum;
+import com.oriole.wisepen.resource.domain.GroupTagBind;
 import com.oriole.wisepen.resource.domain.dto.*;
+import com.oriole.wisepen.resource.domain.dto.req.ResourceForkRequest;
 import com.oriole.wisepen.resource.domain.dto.req.ResourceRenameRequest;
 import com.oriole.wisepen.resource.domain.dto.req.ResourceUpdateActionPermissionRequest;
 import com.oriole.wisepen.resource.domain.dto.res.ResourceItemResponse;
 import com.oriole.wisepen.resource.domain.entity.ResourceItemEntity;
+import com.oriole.wisepen.resource.domain.entity.TagEntity;
 import com.oriole.wisepen.resource.enums.ResourceSortBy;
 
 import java.util.List;
@@ -23,11 +26,15 @@ public interface IResourceService {
     // ToUser：重命名、变更Tag、列出资源
     void renameResource(ResourceRenameRequest req);
 
+    List<GroupTagBind> updateResourceGroupBinds(List<GroupTagBind> groupBinds, String groupId, List<String> tagIds);
+
     void updatePersonalResourceTags (String resourceId, String groupId, List<String> tagIds);
 
     void updateGroupResourceTags(String resourceId, String groupId, String userId, GroupRoleType groupRole, List<String> tagIds);
 
     void updateGroupResourceTags(ResourceItemEntity resource, String groupId, String userId, GroupRoleType groupRole, List<String> tagIds);
+
+    List<TagEntity> findAndValidateTags(String groupId, List<String> tagIds);
 
     void updateResourceActionPermission(ResourceUpdateActionPermissionRequest req);
 
@@ -49,6 +56,8 @@ public interface IResourceService {
     // ToService：增加、移除、更新资源；检查特定资源的权限
 
     String createResourceItem(ResourceCreateReqDTO dto);
+
+    void forkResource(ResourceForkRequest req, String forkedResourceOwnerId);
 
     void hardRemoveResources(List<String> resourceIds);
 

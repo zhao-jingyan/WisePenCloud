@@ -1,6 +1,5 @@
 package com.oriole.wisepen.resource.domain.mq;
 
-import com.oriole.wisepen.resource.enums.MarketPurchaseType;
 import com.oriole.wisepen.resource.enums.ResourceType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -22,6 +21,6 @@ public class ResourceForkMessage {
 
     private Long forkedResourceOwnerId;
 
-    private Long forkedResourceVersion;
+    private Integer forkedResourceVersion;
 
 }

@@ -5,10 +5,11 @@ import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 
 @Data
-public class MarketOffShelfOfferRequest {
+public class ResourceForkRequest {
     @NotBlank(message = ResourceValidationMsg.RESOURCE_ID_NOT_BLANK)
     private String resourceId;
 
-    @NotBlank(message = ResourceValidationMsg.GROUP_ID_NOT_BLANK)
-    private String marketGroupId;
+    private Integer forkedResourceVersion;
+
+    private String forkedResourceName;
 }

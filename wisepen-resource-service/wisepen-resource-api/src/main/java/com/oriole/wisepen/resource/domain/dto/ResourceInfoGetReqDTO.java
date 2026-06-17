@@ -22,4 +22,6 @@ public class ResourceInfoGetReqDTO {
     private Long userId;
     @NotNull(message = ResourceValidationMsg.USER_GROUP_ROLES_NOT_NULL)
     private Map<Long, GroupRoleType> groupRoles;
+
+    private Integer targetVersion;
 }

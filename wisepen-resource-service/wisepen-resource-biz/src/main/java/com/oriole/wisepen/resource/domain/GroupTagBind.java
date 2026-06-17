@@ -20,8 +20,8 @@ public class GroupTagBind {
     @Indexed // 加上索引，方便后续 Tag 权限变更时反查关联了该 Tag 的资源
     private List<String> tagIds;
 
-    // 仅集市组使用，承载该 marketGroup 下的两种购买权益
-    private MarketOfferOptions marketOffers;
+    // 仅集市组使用
+    private MarketOfferOption marketOffer;
 
     @Builder
     public GroupTagBind(List<String> tagIds, String groupId) {

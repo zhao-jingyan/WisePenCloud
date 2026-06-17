@@ -2,6 +2,7 @@ package com.oriole.wisepen.resource.constant;
 
 public interface ResourceConstants {
     String PERSONAL_GROUP_PREFIX = "p_";
+    String MARKET_GROUP_PREFIX = "M_";
 
     // 系统级保留路径节点名称
     String ROOT_TAG_NAME = "/";

@@ -5,11 +5,10 @@ import com.oriole.wisepen.common.core.domain.enums.GroupRoleType;
 import com.oriole.wisepen.resource.constant.ResourceConstants;
 import com.oriole.wisepen.resource.domain.ComputedGroupAcl;
 import com.oriole.wisepen.resource.domain.GroupTagBind;
-import com.oriole.wisepen.resource.domain.MarketOfferInfo;
-import com.oriole.wisepen.resource.domain.MarketOfferOptions;
+import com.oriole.wisepen.resource.domain.MarketOfferOption;
 import com.oriole.wisepen.resource.domain.base.TagInfoBase;
 import com.oriole.wisepen.resource.domain.dto.res.MarketOfferInfoResponse;
-import com.oriole.wisepen.resource.domain.dto.res.MarketOfferOptionsResponse;
+import com.oriole.wisepen.resource.domain.dto.res.MarketOfferOptionResponse;
 import com.oriole.wisepen.resource.domain.dto.res.ResourceItemResponse;
 import com.oriole.wisepen.resource.domain.entity.ResourceItemEntity;
 import com.oriole.wisepen.resource.domain.entity.TagEntity;
@@ -29,6 +28,8 @@ import org.springframework.util.StringUtils;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import static com.oriole.wisepen.resource.enums.ResourceAction.MARKET_FORBIDDEN_ACTIONS_MASK;
+
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -44,11 +45,6 @@ public class ResourceItemResponseAssembler {
     }
 
     public List<ResourceItemResponse> assembleMany(List<ResourceItemEntity> entities, String currentUserId, Map<Long, GroupRoleType> groupRoles, List<ResourceAction> requiredResourceActions) {
-        return assembleMany(entities, currentUserId, groupRoles, requiredResourceActions, null);
-    }
-
-    public List<ResourceItemResponse> assembleMany(List<ResourceItemEntity> entities, String currentUserId, Map<Long, GroupRoleType> groupRoles,
-                                                   List<ResourceAction> requiredResourceActions, String visibleMarketGroupId) {
         if (entities == null || entities.isEmpty()) {
             return Collections.emptyList();
         }
@@ -78,20 +74,40 @@ public class ResourceItemResponseAssembler {
             response.setOwnerInfo(resolveOwnerInfo(entity, ownerInfoMap));
             // 解析 CurrentTags
             response.setCurrentTags(resolveCurrentTags(resourcesTagIdsMap.getOrDefault(entity.getResourceId(), Collections.emptyList()), tagInfosMap));
-            // 仅在明确的集市组上下文下解析上架权益
-            response.setMarketOffers(resolveVisibleMarketOffers(entity, visibleMarketGroupId, currentUserId, groupRoles));
+            // 解析 MarketOfferOption
+            List<Map<String, MarketOfferOptionResponse>> marketOfferOptions = resolveMarketOffer(entity.getGroupBinds());
 
             // 仅所有者有此字段
             if (currentUserId.equals(entity.getOwnerId())) {
                 // 处理权限掩码解包
                 if (entity.getOverrideGrantedActionsMask() != null) {
-                    response.setOverrideGrantedActions(ResourceAction.permissionCodeToActions(entity.getOverrideGrantedActionsMask()));
+                    Map<String, List<ResourceAction>> overrideGrantedActions = new HashMap<>();
+                    entity.getOverrideGrantedActionsMask().forEach((groupId, mask) ->
+                            overrideGrantedActions.put(groupId, ResourceAction.permissionCodeToActions(mask)));
+                    response.setOverrideGrantedActions(overrideGrantedActions);
                 }
                 if (entity.getSpecifiedUsersGrantedActionsMask() != null) {
                     Map<String, List<ResourceAction>> specifiedUsersGrantedActions = new HashMap<>();
                     entity.getSpecifiedUsersGrantedActionsMask().forEach((userId, mask) -> specifiedUsersGrantedActions.put(userId, ResourceAction.permissionCodeToActions(mask)));
                     response.setSpecifiedUsersGrantedActions(specifiedUsersGrantedActions);
                 }
+                // 提供全部 MarketOffer 信息
+                marketOfferOptions.getFirst().entrySet().stream().peek(entry -> response.getMarketOfferOptions().put(entry.getKey(), entry.getValue()));
+                marketOfferOptions.getLast().entrySet().stream().peek(entry -> response.getMarketOfferOptions().put(entry.getKey(), entry.getValue()));
+            } else {
+                // 提供 MarketOffer 信息
+                // 仅提供用户所在集市组的已上架的 MarketOffer 信息
+                marketOfferOptions.getFirst().entrySet().stream().peek(entry -> {
+                    if (groupRoles.keySet().contains(entry.getKey())) {
+                        response.getMarketOfferOptions().put(entry.getKey(), entry.getValue());
+                    }
+                });
+                // 提供用户所在集市组的未上架的 MarketOffer 信息（当用户是集市组的管理员时）
+                marketOfferOptions.getLast().entrySet().stream().peek(entry -> {
+                    if (groupRoles.get(entry.getKey()).equals(GroupRoleType.ADMIN) || groupRoles.get(entry.getKey()).equals(GroupRoleType.OWNER)) {
+                        response.getMarketOfferOptions().put(entry.getKey(), entry.getValue());
+                    }
+                });
             }
             return response;
         }).toList();
@@ -187,9 +203,18 @@ public class ResourceItemResponseAssembler {
 
                 // 用户是组管理员/拥有者，有全部权限
                 if (groupRole == GroupRoleType.ADMIN || groupRole == GroupRoleType.OWNER) {
-                    permissionSources.add(groupId.toString());
-                    groupActionsMask = ResourceAction.ALL_ACTIONS;
-                    groupResourceAccessRole = ResourceAccessRole.GROUP_ADMIN;
+                    boolean isMarketGroup = entity.getGroupBinds().stream().anyMatch(groupTagBind ->
+                            groupTagBind.getGroupId().equals(groupId.toString()) && groupTagBind.getMarketOffer() != null);
+                    if (isMarketGroup) {
+                        // 不能存在 MARKET_FORBIDDEN_ACTIONS_MASK 中的权限
+                        permissionSources.add(groupId.toString());
+                        groupActionsMask = ResourceAction.ALL_ACTIONS & ~MARKET_FORBIDDEN_ACTIONS_MASK;
+                        groupResourceAccessRole = ResourceAccessRole.GROUP_ADMIN;
+                    } else {
+                        permissionSources.add(groupId.toString());
+                        groupActionsMask = ResourceAction.ALL_ACTIONS;
+                        groupResourceAccessRole = ResourceAccessRole.GROUP_ADMIN;
+                    }
                     break;
                 }
 
@@ -207,51 +232,7 @@ public class ResourceItemResponseAssembler {
             }
         }
 
-        // 应用资源群组策略覆盖
-        // 优先级：群组策略覆盖 (Override) > 群组策略 (actionsMask)
-        if (groupResourceAccessRole != ResourceAccessRole.NONE) { // 组策略覆盖的前提是用户在某个组内且有基础权限（无权限(0)不在此列）
-            groupActionsMask = entity.getOverrideGrantedActionsMask() == null ? groupActionsMask : entity.getOverrideGrantedActionsMask();
-        }
         return new ResolvedResourceAccess(groupResourceAccessRole, permissionSources, groupActionsMask);
-    }
-
-    private MarketOfferOptionsResponse resolveVisibleMarketOffers(ResourceItemEntity entity, String groupId,
-                                                                  String currentUserId, Map<Long, GroupRoleType> groupRoles) {
-        if (!StringUtils.hasText(groupId) || entity.getGroupBinds() == null) {
-            return null;
-        }
-        GroupTagBind marketBind = entity.getGroupBinds().stream()
-                .filter(bind -> groupId.equals(bind.getGroupId()))
-                .findFirst()
-                .orElse(null);
-        if (marketBind == null || marketBind.getMarketOffers() == null) {
-            return null;
-        }
-
-        boolean isOwner = currentUserId.equals(entity.getOwnerId());
-        GroupRoleType groupRole = null;
-        if (groupRoles != null && !groupId.startsWith(ResourceConstants.PERSONAL_GROUP_PREFIX)) {
-            groupRole = groupRoles.get(Long.valueOf(groupId));
-        }
-        boolean isGroupAdmin = groupRole == GroupRoleType.ADMIN || groupRole == GroupRoleType.OWNER;
-        MarketOfferOptions offers = marketBind.getMarketOffers();
-        MarketOfferInfoResponse forkOnce = null;
-        MarketOfferInfo forkOnceOffer = offers.getForkOnce();
-        if (forkOnceOffer != null && (isOwner || isGroupAdmin || forkOnceOffer.getStatus() == MarketOfferStatus.PUBLISHED)) {
-            forkOnce = BeanUtil.copyProperties(forkOnceOffer, MarketOfferInfoResponse.class);
-        }
-        MarketOfferInfoResponse forkUnlimited = null;
-        MarketOfferInfo forkUnlimitedOffer = offers.getForkUnlimited();
-        if (forkUnlimitedOffer != null && (isOwner || isGroupAdmin || forkUnlimitedOffer.getStatus() == MarketOfferStatus.PUBLISHED)) {
-            forkUnlimited = BeanUtil.copyProperties(forkUnlimitedOffer, MarketOfferInfoResponse.class);
-        }
-        if (forkOnce == null && forkUnlimited == null) {
-            return null;
-        }
-        MarketOfferOptionsResponse response = new MarketOfferOptionsResponse();
-        response.setForkOnce(forkOnce);
-        response.setForkUnlimited(forkUnlimited);
-        return response;
     }
 
     private UserDisplayBase resolveOwnerInfo(ResourceItemEntity entity, Map<Long, UserDisplayBase> ownerInfoMap) {
@@ -267,4 +248,30 @@ public class ResourceItemResponseAssembler {
         }
         return currentTags;
     }
+
+    private List<Map<String, MarketOfferOptionResponse>> resolveMarketOffer(List<GroupTagBind> groupBinds) {
+        Map<String, MarketOfferOptionResponse> onShelf = new HashMap<>();
+        Map<String, MarketOfferOptionResponse> notOnShelf = new HashMap<>();
+
+        groupBinds.stream().peek(bind -> {
+            if (bind.getMarketOffer() != null) {
+                MarketOfferOption offer = bind.getMarketOffer();
+                // MarketOfferOption 转换为 MarketOfferOptionResponse
+                MarketOfferOptionResponse marketOfferOptionResponse = BeanUtil.copyProperties(offer, MarketOfferOptionResponse.class);
+                marketOfferOptionResponse.setMarketOfferList(offer.getMarketOfferList().stream().map(marketOfferInfoBase -> {
+                    MarketOfferInfoResponse marketOfferInfoResponse = BeanUtil.copyProperties(marketOfferInfoBase, MarketOfferInfoResponse.class);
+                    marketOfferInfoResponse.setGrantedActions(ResourceAction.permissionCodeToActions(marketOfferInfoBase.getGrantedActionsMask()));
+                    return marketOfferInfoResponse;
+                }).toList());
+                // 拆分是否已经上架
+                if (offer.getStatus().equals(MarketOfferStatus.PUBLISHED)) {
+                    onShelf.put(bind.getGroupId(), marketOfferOptionResponse);
+                } else {
+                    notOnShelf.put(bind.getGroupId(), marketOfferOptionResponse);
+                }
+            }
+        });
+        return List.of(onShelf, notOnShelf);
+    }
 }
+

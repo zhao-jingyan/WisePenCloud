@@ -64,8 +64,8 @@ public class KafkaResourceEventPublisherImpl implements IResourceEventPublisher 
                 MqTopicConstants.TOPIC_RESOURCE_FORK,
                 message.getForkTaskId(),
                 message.getSourceResourceId(),
-                message.getResourceType(),
-                message.getVersion());
+                message.getSourceResourceType(),
+                message.getForkedResourceVersion());
         reliablePublisher.publish(MqTopicConstants.TOPIC_RESOURCE_FORK, dedupKey, message, dedupKey);
     }
 }

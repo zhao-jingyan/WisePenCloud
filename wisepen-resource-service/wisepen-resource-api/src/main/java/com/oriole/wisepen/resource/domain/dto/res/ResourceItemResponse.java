@@ -19,8 +19,8 @@ public class ResourceItemResponse extends ResourceItemInfoBase {
     private Map<String, TagInfoBase> currentTags;
     private List<ResourceAction> currentActions;
 
-    private List<ResourceAction> overrideGrantedActions;
+    private Map<String, List<ResourceAction>> overrideGrantedActions;
     private Map<String, List<ResourceAction>> specifiedUsersGrantedActions;
 
-    private MarketOfferOptionsResponse marketOffers;
+    private Map<String, MarketOfferOptionResponse> marketOfferOptions;
 }

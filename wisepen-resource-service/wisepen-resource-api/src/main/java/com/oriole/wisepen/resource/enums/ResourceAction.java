@@ -23,6 +23,9 @@ public enum ResourceAction {
     public static final int ALL_ACTIONS = (1 << values().length) - 1;
     public static final int DEFAULT_MEMBER_ACTIONS = DISCOVER.code | VIEW.code | DOWNLOAD_WATERMARK.code;
 
+    public static final int MARKET_BASE_ACTIONS = DISCOVER.code | VIEW.code | COMMENT.code;
+    public static final int MARKET_FORBIDDEN_ACTIONS_MASK = EDIT.code;
+
     private final int code;
 
     public int getImpliedMask() {

@@ -2,7 +2,6 @@ package com.oriole.wisepen.resource.domain.dto;
 
 import com.oriole.wisepen.common.core.domain.enums.GroupRoleType;
 import com.oriole.wisepen.resource.constant.ResourceValidationMsg;
-import com.oriole.wisepen.resource.enums.ResourceType;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
@@ -23,4 +22,11 @@ public class ResourceCheckPermissionReqDTO {
     private Long userId;
     @NotNull(message = ResourceValidationMsg.USER_GROUP_ROLES_NOT_NULL)
     private Map<Long, GroupRoleType> groupRoles;
+    private Integer version;
+
+    public ResourceCheckPermissionReqDTO(String resourceId, Long userId, Map<Long, GroupRoleType> groupRoles) {
+        this.resourceId = resourceId;
+        this.userId = userId;
+        this.groupRoles = groupRoles;
+    }
 }

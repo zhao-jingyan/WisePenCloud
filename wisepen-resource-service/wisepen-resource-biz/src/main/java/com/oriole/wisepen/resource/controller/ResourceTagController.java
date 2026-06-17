@@ -21,6 +21,7 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
+import static com.oriole.wisepen.resource.constant.ResourceConstants.MARKET_GROUP_PREFIX;
 import static com.oriole.wisepen.resource.constant.ResourceConstants.PERSONAL_GROUP_PREFIX;
 
 @Tag(name = "资源标签", description = "个人与小组资源标签的树形维护、权限配置和回收站处理")
@@ -134,10 +135,13 @@ public class ResourceTagController {
         if (!StringUtils.hasText(tagSpaceBase.getGroupId())) {
             tagSpaceBase.setGroupId(PERSONAL_GROUP_PREFIX + SecurityContextHolder.getUserId()); // 个人私有空间 (p_开头)
         } else { // 正常群组
+            String rawGroupId = tagSpaceBase.getGroupId().startsWith(MARKET_GROUP_PREFIX)
+                    ? tagSpaceBase.getGroupId().substring(MARKET_GROUP_PREFIX.length())
+                    : tagSpaceBase.getGroupId();
             if (isWriteOp){ // 写操作，必须是群组的 Admin 或 Owner
-                SecurityContextHolder.assertGroupRole(Long.valueOf(tagSpaceBase.getGroupId()), GroupRoleType.OWNER, GroupRoleType.ADMIN);
+                SecurityContextHolder.assertGroupRole(Long.valueOf(rawGroupId), GroupRoleType.OWNER, GroupRoleType.ADMIN);
             } else { // 读操作，必须是群组成员
-                SecurityContextHolder.assertInGroup(Long.valueOf(tagSpaceBase.getGroupId()));
+                SecurityContextHolder.assertInGroup(Long.valueOf(rawGroupId));
             }
         }
     }

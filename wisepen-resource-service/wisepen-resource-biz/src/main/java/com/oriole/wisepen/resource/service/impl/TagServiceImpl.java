@@ -2,6 +2,7 @@ package com.oriole.wisepen.resource.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.bean.copier.CopyOptions;
+import com.oriole.wisepen.common.core.domain.enums.GroupType;
 import com.oriole.wisepen.common.core.exception.ServiceException;
 import com.oriole.wisepen.resource.constant.ResourceConstants;
 import com.oriole.wisepen.resource.domain.dto.req.TagCreateRequest;
@@ -17,6 +18,8 @@ import com.oriole.wisepen.resource.event.TagTrashedEvent;
 import com.oriole.wisepen.resource.exception.ResourceError;
 import com.oriole.wisepen.resource.repository.TagRepository;
 import com.oriole.wisepen.resource.service.ITagService;
+import com.oriole.wisepen.user.api.domain.base.GroupDisplayBase;
+import com.oriole.wisepen.user.api.feign.RemoteUserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
@@ -39,12 +42,28 @@ public class TagServiceImpl implements ITagService {
 
     private final TagRepository tagRepository;
     private final MongoTemplate mongoTemplate;
+    private final RemoteUserService remoteUserService;
 
     private final ApplicationEventPublisher eventPublisher;
 
     @Override
     public String createTag(TagCreateRequest tagCreateRequest) {
         String groupID = tagCreateRequest.getGroupId();
+
+        // 检查是否是 Market 组
+        if (!groupID.startsWith(ResourceConstants.PERSONAL_GROUP_PREFIX)) {
+            String rawGroupId = groupID.startsWith(ResourceConstants.MARKET_GROUP_PREFIX)
+                    ? groupID.substring(ResourceConstants.MARKET_GROUP_PREFIX.length())
+                    : groupID;
+
+            // 检查 groupID对应的小组是否是 MARKET_GROUP，如果是则添加MARKET_GROUP_PREFIX，否则不添加
+            Map<Long, GroupDisplayBase> groupMap = remoteUserService.getGroupDisplayInfo(List.of(Long.valueOf(rawGroupId))).getData();
+            GroupDisplayBase groupInfo = groupMap == null ? null : groupMap.get(Long.valueOf(rawGroupId));
+            groupID = groupInfo != null && groupInfo.getGroupType() == GroupType.MARKET_GROUP
+                    ? ResourceConstants.MARKET_GROUP_PREFIX + rawGroupId : rawGroupId;
+
+            tagCreateRequest.setGroupId(groupID);
+        }
         String parentId = tagCreateRequest.getParentId();
         String tagName = tagCreateRequest.getTagName();
 

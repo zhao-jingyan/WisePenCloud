@@ -12,17 +12,13 @@ import java.util.Map;
 
 public interface IMarketService {
 
-    void publishOffer(MarketPublishOfferRequest request, Long sellerId, Map<Long, GroupRoleType> groupRoles);
+    void publishOffer(MarketPublishOfferRequest request);
 
-    void offShelfOffer(MarketOffShelfOfferRequest request, Long operatorId, Map<Long, GroupRoleType> groupRoles);
+    void offShelfOffer(MarketOffShelfOfferRequest request);
 
-    void auditOffer(MarketAuditOfferRequest request, Long operatorId, Map<Long, GroupRoleType> groupRoles);
+    void auditOffer(MarketAuditOfferRequest request, String operatorId);
 
-    MarketOrderResponse purchase(MarketPurchaseRequest request, Long buyerId, Map<Long, GroupRoleType> groupRoles);
+    MarketOrderResponse purchase(MarketPurchaseRequest request, String buyerId);
 
-    void fork(String orderId, Long buyerId);
-
-    void compensateFork(String orderId, String forkTaskId);
-
-    PageR<MarketOrderResponse> listMyOrders(String buyerId, int page, int size);
+    PageR<MarketOrderResponse> listOrders(String buyerId, int page, int size);
 }

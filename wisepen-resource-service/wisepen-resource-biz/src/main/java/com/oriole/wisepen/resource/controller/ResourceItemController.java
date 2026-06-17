@@ -5,7 +5,6 @@ import com.oriole.wisepen.common.core.context.SecurityContextHolder;
 import com.oriole.wisepen.common.core.domain.PageR;
 import com.oriole.wisepen.common.core.domain.R;
 import com.oriole.wisepen.common.core.domain.enums.BusinessType;
-import com.oriole.wisepen.common.core.domain.enums.GroupType;
 import com.oriole.wisepen.common.core.domain.enums.GroupRoleType;
 import com.oriole.wisepen.common.core.domain.enums.list.QueryLogicEnum;
 import com.oriole.wisepen.common.core.domain.enums.list.SortDirectionEnum;
@@ -13,15 +12,17 @@ import com.oriole.wisepen.common.core.exception.ServiceException;
 import com.oriole.wisepen.common.log.annotation.Log;
 import com.oriole.wisepen.common.security.annotation.CheckLogin;
 import com.oriole.wisepen.resource.constant.ResourceConstants;
+import com.oriole.wisepen.resource.domain.dto.ResourceCheckPermissionReqDTO;
+import com.oriole.wisepen.resource.domain.dto.ResourceCheckPermissionResDTO;
+import com.oriole.wisepen.resource.domain.dto.req.ResourceForkRequest;
 import com.oriole.wisepen.resource.domain.dto.req.ResourceUpdateActionPermissionRequest;
 import com.oriole.wisepen.resource.domain.dto.res.ResourceItemResponse;
 import com.oriole.wisepen.resource.domain.dto.req.ResourceRenameRequest;
 import com.oriole.wisepen.resource.domain.dto.req.ResourceUpdateTagsRequest;
+import com.oriole.wisepen.resource.enums.ResourceAction;
 import com.oriole.wisepen.resource.enums.ResourceSortBy;
 import com.oriole.wisepen.resource.exception.ResourceError;
 import com.oriole.wisepen.resource.service.IResourceService;
-import com.oriole.wisepen.user.api.domain.base.GroupDisplayBase;
-import com.oriole.wisepen.user.api.feign.RemoteUserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -40,7 +41,6 @@ import java.util.Map;
 public class ResourceItemController {
 
     private final IResourceService resourceService;
-    private final RemoteUserService remoteUserService;
 
     // 重命名资源
     @Operation(
@@ -110,6 +110,9 @@ public class ResourceItemController {
                     req.getTagIds()
             );
         } else {
+            if (req.getGroupId().startsWith(ResourceConstants.MARKET_GROUP_PREFIX)) {
+                throw new ServiceException(ResourceError.CANNOT_BIND_MARKET_RESOURCE_DIRECTLY);
+            }
             // 资源所有者或小组管理员可以修改资源挂载的小组标签
             GroupRoleType groupRole = SecurityContextHolder.getGroupRole(Long.parseLong(req.getGroupId()));
             if (groupRole != GroupRoleType.ADMIN && groupRole != GroupRoleType.OWNER) {
@@ -131,9 +134,9 @@ public class ResourceItemController {
             summary = "更新资源独立权限",
             description = """
                     - 用途：资源所有者设置资源级动作权限覆盖规则和指定用户特权动作。
-                    - 请求：resourceId 指定目标资源；overrideGrantedActions 为空表示清空资源级覆盖动作；specifiedUsersGrantedActions 为空表示清空指定用户特权。
-                    - 约束：当前用户必须是资源所有者；目标资源必须存在；动作列表必须是合法资源动作枚举。
-                    - 处理：保存资源级覆盖权限和指定用户权限映射，并触发资源 ACL 重算；不修改资源标签绑定、默认小组权限或资源内容。
+                    - 请求：resourceId 指定目标资源；overrideGrantedActions 是 groupId -> actions 的覆盖映射，null 表示清空普通组覆盖；specifiedUsersGrantedActions 为空表示清空指定用户特权。
+                    - 约束：当前用户必须是资源所有者；目标资源必须存在；动作列表必须是合法资源动作枚举；Market group 覆盖不能通过本接口修改。
+                    - 处理：保存资源级覆盖权限和指定用户权限映射，并触发资源 ACL 重算；Market 审核 override 会被保留；不修改资源标签绑定、默认小组权限或资源内容。
                     - 失败：未登录 -> PermissionError.NOT_LOGIN；资源不存在 -> ResourceError.RESOURCE_NOT_FOUND；当前用户不是资源所有者 -> ResourceError.RESOURCE_PERMISSION_DENIED。
                     - 响应：成功时返回空结果。
                     """
@@ -145,6 +148,34 @@ public class ResourceItemController {
 
         resourceService.assertResourceOwner(req.getResourceId(), userId);
         resourceService.updateResourceActionPermission(req);
+        return R.ok();
+    }
+
+    @Operation(
+            summary = "复制资源",
+            description = """
+                    - 用途：当前用户复制任意自己拥有 FORK 动作的资源。
+                    - 请求：resourceId 指定源资源；targetVersion 可选，用于版本敏感资源的权限裁决和复制目标版本。
+                    - 约束：当前用户必须拥有源资源 FORK 动作；Market 来源授权只在 targetVersion 等于当前上架 offerVersion 时生效。
+                    - 处理：通过资源权限接口实时校验 FORK 动作，校验通过后发布资源复制消息；不依赖 Market 订单或复制次数。
+                    - 响应：成功时返回空结果。
+                    """
+    )
+    @Log(title = "复制资源", businessType = BusinessType.INSERT)
+    @PostMapping("/forkResource")
+    public R<Void> forkResource(@Validated @RequestBody ResourceForkRequest req) {
+        // 复制资源需要完整鉴权
+        ResourceCheckPermissionResDTO permission = resourceService.checkPermission(ResourceCheckPermissionReqDTO.builder()
+                .resourceId(req.getResourceId())
+                .userId(SecurityContextHolder.getUserId())
+                .groupRoles(SecurityContextHolder.getGroupRoleMap())
+                .version(req.getForkedResourceVersion())
+                .build());
+
+        if (permission.getAllowedActions() == null || !permission.getAllowedActions().contains(ResourceAction.FORK)) {
+            throw new ServiceException(ResourceError.RESOURCE_PERMISSION_DENIED);
+        }
+        resourceService.forkResource(req, SecurityContextHolder.getUserId().toString());
         return R.ok();
     }
 
@@ -181,7 +212,10 @@ public class ResourceItemController {
         if (!StringUtils.hasText(groupId)) {
             groupId = ResourceConstants.PERSONAL_GROUP_PREFIX + userId;
         } else {
-            userGroupRole = SecurityContextHolder.assertInGroup(Long.valueOf(groupId));
+            String rawGroupId = groupId.startsWith(ResourceConstants.MARKET_GROUP_PREFIX)
+                    ? groupId.substring(ResourceConstants.MARKET_GROUP_PREFIX.length())
+                    : groupId;
+            userGroupRole = SecurityContextHolder.assertInGroup(Long.valueOf(rawGroupId));
         }
 
         PageR<ResourceItemResponse> result = resourceService.listResources(
