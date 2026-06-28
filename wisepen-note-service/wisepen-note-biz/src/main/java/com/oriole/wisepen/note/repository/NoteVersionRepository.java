@@ -24,19 +24,19 @@ public interface NoteVersionRepository extends MongoRepository<NoteVersionEntity
     Optional<NoteVersionEntity> findFirstByResourceIdOrderByVersionDesc(String resourceId);
 
     /** 查找指定资源的特定版本 */
-    Optional<NoteVersionEntity> findByResourceIdAndVersion(String resourceId, Long version);
+    Optional<NoteVersionEntity> findByResourceIdAndVersion(String resourceId, Integer version);
 
     /** 查询指定资源在指定版本号（含）之前的最新特定类型版本记录 */
     Optional<NoteVersionEntity> findFirstByResourceIdAndTypeAndVersionLessThanEqualOrderByVersionDesc(
-            String resourceId, VersionType type, Long version);
+            String resourceId, VersionType type, Integer version);
 
     /** 查询指定资源在指定版本号之后的所有特定类型版本记录，并按版本号升序排列 */
     List<NoteVersionEntity> findByResourceIdAndVersionGreaterThanAndTypeOrderByVersionAsc(
-            String resourceId, Long version, VersionType type);
+            String resourceId, Integer version, VersionType type);
 
     /** 查询指定资源在指定版本号区间内的所有特定类型版本记录，并按版本号升序排列, 查询区间为左开右闭(startVersion, endVersion] **/
     List<NoteVersionEntity> findByResourceIdAndVersionGreaterThanAndVersionLessThanEqualAndTypeOrderByVersionAsc(
-            String resourceId, Long startVersion, Long endVersion, VersionType type);
+            String resourceId, Integer startVersion, Integer endVersion, VersionType type);
 
     void deleteByResourceIdIn(List<String> resourceIds);
 }

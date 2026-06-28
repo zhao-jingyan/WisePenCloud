@@ -1,19 +1,20 @@
 package com.oriole.wisepen.note.service;
 
 import com.oriole.wisepen.common.core.domain.PageR;
+import com.oriole.wisepen.note.api.domain.base.NoteSnapshotBase;
 import com.oriole.wisepen.note.api.domain.dto.res.NoteSnapshotResponse;
-import com.oriole.wisepen.note.api.domain.dto.res.NoteVersionListResponse;
-import com.oriole.wisepen.note.api.domain.mq.NoteSnapshotMessage;
+import com.oriole.wisepen.note.api.domain.dto.res.NoteVersionInfoResponse;
+import com.oriole.wisepen.resource.enums.ResourceType;
 
 import java.util.List;
 
 public interface INoteVersionService {
 
-    void createVersion(NoteSnapshotMessage noteSnapshotMessage);
+    void createVersion(NoteSnapshotBase noteSnapshotMessage, List<Long> authors, ResourceType resourceType);
 
     NoteSnapshotResponse getLatestVersion(String resourceId);
 
-    PageR<NoteVersionListResponse> listVersions(String resourceId, int page, int size);
+    PageR<NoteVersionInfoResponse> listVersions(String resourceId, int page, int size);
 
     void deleteAllVersionsByResourceIds(List<String> resourceIds);
 }

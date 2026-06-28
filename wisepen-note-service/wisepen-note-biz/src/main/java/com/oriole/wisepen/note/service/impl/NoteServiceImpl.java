@@ -2,15 +2,16 @@ package com.oriole.wisepen.note.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
 import com.oriole.wisepen.common.core.exception.ServiceException;
-import com.oriole.wisepen.note.api.domain.base.NoteInfoBase;
 import com.oriole.wisepen.note.api.domain.dto.req.NoteCreateRequest;
 import com.oriole.wisepen.note.api.domain.dto.req.NoteForkRequest;
 import com.oriole.wisepen.note.api.domain.enums.VersionType;
+import com.oriole.wisepen.note.domain.entity.NoteContentEntity;
 import com.oriole.wisepen.note.domain.entity.NoteInfoEntity;
 import com.oriole.wisepen.note.domain.entity.NoteVersionEntity;
 import com.oriole.wisepen.note.exception.NoteError;
-import com.oriole.wisepen.note.repository.NoteDocumentRepository;
+import com.oriole.wisepen.note.repository.NoteInfoRepository;
 import com.oriole.wisepen.note.repository.NoteVersionRepository;
+import com.oriole.wisepen.note.repository.NoteContentRepository;
 import com.oriole.wisepen.note.service.INoteOperationLogService;
 import com.oriole.wisepen.note.service.INoteService;
 import com.oriole.wisepen.note.service.INoteVersionService;
@@ -32,15 +33,21 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class NoteServiceImpl implements INoteService {
 
-    private final NoteDocumentRepository noteDocumentRepository;
+    private final NoteInfoRepository noteInfoRepository;
 
     private final NoteVersionRepository noteVersionRepository;
+    private final NoteContentRepository noteContentRepository;
     private final INoteVersionService noteVersionService;
     private final INoteOperationLogService noteOperationLogService;
     private final RemoteResourceService remoteResourceService;
 
     @Override
     public String createNote(NoteCreateRequest request, String userId) {
+        ResourceType resourceType = request.getResourceType() == null ? ResourceType.NOTE : request.getResourceType();
+        // 检查资源类型
+        if (resourceType != ResourceType.NOTE && resourceType != ResourceType.DRAWIO) {
+            throw new ServiceException(NoteError.CANNOT_SUPPORT_NOTE_RESOURCE_TYPE);
+        }
 
         // 向 resource 服务注册Note资源
         String resourceId;
@@ -48,7 +55,7 @@ public class NoteServiceImpl implements INoteService {
             resourceId = remoteResourceService.createResource(
                     ResourceCreateReqDTO.builder()
                             .resourceName(request.getTitle())
-                            .resourceType(ResourceType.NOTE)
+                            .resourceType(resourceType)
                             .ownerId(userId)
                             .build()
             ).getData();
@@ -62,10 +69,12 @@ public class NoteServiceImpl implements INoteService {
 
         NoteInfoEntity infoEntity = NoteInfoEntity.builder()
                 .resourceId(resourceId)
-                .lastUpdatedAt(LocalDateTime.now())
+                .resourceType(resourceType)
+                .version(0)
+                .updateTime(LocalDateTime.now())
                 .authors(authors)
                 .build();
-        noteDocumentRepository.save(infoEntity);
+        noteInfoRepository.save(infoEntity);
         return resourceId;
     }
 
@@ -76,23 +85,22 @@ public class NoteServiceImpl implements INoteService {
             return;
         }
         // 移除所有内容
-        noteDocumentRepository.deleteByResourceIdIn(resourceIds);
-
+        noteInfoRepository.deleteByResourceIdIn(resourceIds);
+        noteContentRepository.deleteByResourceIdIn(resourceIds);
         noteVersionService.deleteAllVersionsByResourceIds(resourceIds);
         noteOperationLogService.deleteAllOpLogsByResourceIds(resourceIds);
     }
 
     @Override
-    public NoteInfoBase getNoteInfo(String resourceId) {
-        NoteInfoEntity noteInfoEntity = noteDocumentRepository.findByResourceId(resourceId)
+    public NoteInfoEntity getNoteInfo(String resourceId) {
+        return noteInfoRepository.findByResourceId(resourceId)
                 .orElseThrow(() -> new ServiceException(NoteError.NOTE_NOT_FOUND));
-        return BeanUtil.copyProperties(noteInfoEntity, NoteInfoBase.class);
     }
 
     @Override
     @Transactional
     public String forkNote(NoteForkRequest request, String forkedResourceOwnerId) {
-        NoteInfoEntity sourceInfo = noteDocumentRepository.findByResourceId(request.getResourceId())
+        NoteInfoEntity sourceInfo = noteInfoRepository.findByResourceId(request.getResourceId())
                 .orElseThrow(() -> new ServiceException(NoteError.NOTE_NOT_FOUND));
 
         List<NoteVersionEntity> sourceVersions = new ArrayList<>();
@@ -102,7 +110,7 @@ public class NoteServiceImpl implements INoteService {
         try {
             targetResourceId = remoteResourceService.createResource(ResourceCreateReqDTO.builder()
                     .resourceName(request.getForkedResourceName())
-                    .resourceType(ResourceType.NOTE)
+                    .resourceType(sourceInfo.getResourceType())
                     .ownerId(forkedResourceOwnerId)
                     .build()
             ).getData();
@@ -116,15 +124,13 @@ public class NoteServiceImpl implements INoteService {
             NoteInfoEntity targetInfo = NoteInfoEntity.builder()
                     .resourceId(targetResourceId)
                     .authors(sourceInfo.getAuthors())
-                    .plainText(sourceInfo.getPlainText())
+                    .resourceType(sourceInfo.getResourceType())
+                    .version(0)
+                    .updateTime(LocalDateTime.now())
                     .build();
-            noteDocumentRepository.save(targetInfo);
+            noteInfoRepository.save(targetInfo);
 
-            Long forkedResourceVersion = request.getForkedResourceVersion() == null
-                    ? noteVersionRepository.findFirstByResourceIdOrderByVersionDesc(request.getResourceId())
-                      .map(NoteVersionEntity::getVersion)
-                      .orElse(0L)
-                    : request.getForkedResourceVersion().longValue();
+            Integer forkedResourceVersion = request.getForkedResourceVersion() == null ? sourceInfo.getVersion() : request.getForkedResourceVersion();
 
             // 复制 笔记内容
             // 查询指定资源在指定版本号（含）之前的最新 FULL 版本记录
@@ -132,7 +138,7 @@ public class NoteServiceImpl implements INoteService {
                     .findFirstByResourceIdAndTypeAndVersionLessThanEqualOrderByVersionDesc(
                             request.getResourceId(), VersionType.FULL, forkedResourceVersion);
 
-            Long latestFullVersion = 0L;
+            Integer latestFullVersion = 0;
             if (latestFull.isPresent()) { // 存在这样的 FULL 版本
                 sourceVersions.add(latestFull.get());
                 latestFullVersion = latestFull.get().getVersion();
@@ -143,11 +149,36 @@ public class NoteServiceImpl implements INoteService {
                     .findByResourceIdAndVersionGreaterThanAndVersionLessThanEqualAndTypeOrderByVersionAsc(
                             request.getResourceId(), latestFullVersion, forkedResourceVersion, VersionType.DELTA));
 
+            Integer baseVersion = latestFullVersion - 1;
+            List<NoteVersionEntity> targetVersions = new ArrayList<>();
             if (!sourceVersions.isEmpty()) {
-                List<NoteVersionEntity> targetVersions = sourceVersions.stream()
-                        .peek(sourceVersion->sourceVersion.setResourceId(targetResourceId)).toList();
+                for (NoteVersionEntity sourceVersion : sourceVersions) {
+                    NoteVersionEntity targetVersion = BeanUtil.copyProperties(sourceVersion, NoteVersionEntity.class);
+                    targetVersion.setId(null);
+                    targetVersion.setResourceId(targetResourceId);
+                    targetVersion.setCreateTime(LocalDateTime.now());
+                    if (baseVersion > 0) { // 重置版本号为自 1 起始
+                        targetVersion.setVersion(targetVersion.getVersion() - baseVersion);
+                    }
+                    targetVersions.add(targetVersion);
+                }
                 noteVersionRepository.saveAll(targetVersions);
             }
+
+            // 如果存在最近的 FULL 版本，则还需要复制 Content
+            if (latestFullVersion != 0) {
+                noteContentRepository.findById(latestFull.get().getResourceId()).ifPresent(sourceContent -> {
+                    NoteContentEntity targetContent = BeanUtil.copyProperties(sourceContent, NoteContentEntity.class);
+                    targetContent.setResourceId(targetResourceId);
+                    if (baseVersion > 0) { // 重置版本号为自 1 起始
+                        targetContent.setVersion(targetContent.getVersion() - baseVersion);
+                    }
+                    noteContentRepository.save(targetContent);
+                });
+            }
+
+            Integer maxVersion = targetVersions.stream().map(NoteVersionEntity::getVersion).max(Integer::compareTo).orElse(0);
+            noteInfoRepository.updateVersionByResourceId(targetResourceId, maxVersion);
 
             log.info("note fork finished. sourceResourceId={} resourceId={} version={}",
                     request.getResourceId(), targetResourceId, forkedResourceVersion);
@@ -155,8 +186,9 @@ public class NoteServiceImpl implements INoteService {
             return targetResourceId;
         } catch (Exception e) {
             // 异常时回滚
+            noteInfoRepository.deleteByResourceIdIn(List.of(targetResourceId));
             noteVersionRepository.deleteByResourceIdIn(List.of(targetResourceId));
-            noteDocumentRepository.deleteByResourceIdIn(List.of(targetResourceId));
+            noteContentRepository.deleteByResourceIdIn(List.of(targetResourceId));
             log.warn("note fork compensated. sourceResourceId={} resourceId={}",
                     request.getResourceId(), targetResourceId, e);
             throw new ServiceException(NoteError.NOTE_FORK_FAILED, e.getMessage());

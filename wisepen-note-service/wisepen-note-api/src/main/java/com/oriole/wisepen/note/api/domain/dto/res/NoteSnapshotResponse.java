@@ -13,7 +13,7 @@ import java.util.List;
 @AllArgsConstructor
 public class NoteSnapshotResponse {
     private String resourceId;
-    private Long version;
+    private Integer version;
     /** Base64 编码的最近一次 FULL 快照 */
     private String fullSnapshot;
     /** 最近 FULL 之后的 DELTA 增量链（Base64 数组），用于崩溃恢复 */

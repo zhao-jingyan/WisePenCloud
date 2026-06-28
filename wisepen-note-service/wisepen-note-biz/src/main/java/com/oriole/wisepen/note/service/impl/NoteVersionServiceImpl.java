@@ -3,16 +3,19 @@ package com.oriole.wisepen.note.service.impl;
 import cn.hutool.core.collection.CollUtil;
 import com.oriole.wisepen.common.core.domain.PageR;
 import com.oriole.wisepen.common.core.exception.ServiceException;
+import com.oriole.wisepen.note.api.domain.base.NoteSnapshotBase;
 import com.oriole.wisepen.note.api.domain.dto.res.NoteSnapshotResponse;
-import com.oriole.wisepen.note.api.domain.dto.res.NoteVersionListResponse;
-import com.oriole.wisepen.note.api.domain.mq.NoteSnapshotMessage;
+import com.oriole.wisepen.note.api.domain.dto.res.NoteVersionInfoResponse;
+import com.oriole.wisepen.note.domain.entity.NoteContentEntity;
 import com.oriole.wisepen.note.domain.entity.NoteInfoEntity;
 import com.oriole.wisepen.note.domain.entity.NoteVersionEntity;
 import com.oriole.wisepen.note.api.domain.enums.VersionType;
 import com.oriole.wisepen.note.exception.NoteError;
-import com.oriole.wisepen.note.repository.NoteDocumentRepository;
+import com.oriole.wisepen.note.repository.NoteContentRepository;
+import com.oriole.wisepen.note.repository.NoteInfoRepository;
 import com.oriole.wisepen.note.repository.NoteVersionRepository;
 import com.oriole.wisepen.note.service.INoteVersionService;
+import com.oriole.wisepen.resource.enums.ResourceType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.bson.types.Binary;
@@ -31,50 +34,54 @@ import java.util.*;
 public class NoteVersionServiceImpl implements INoteVersionService {
 
     private final NoteVersionRepository noteVersionRepository;
-    private final NoteDocumentRepository noteDocumentRepository;
+    private final NoteInfoRepository noteInfoRepository;
+    private final NoteContentRepository noteContentRepository;
 
     @Override
-    public void createVersion(NoteSnapshotMessage msg) {
-        List<Long> updatedBy = msg.getUpdatedBy() != null ? msg.getUpdatedBy().stream().map(Long::valueOf).toList() : null;
+    public void createVersion(NoteSnapshotBase msg, List<Long> authors, ResourceType resourceType) {
+        NoteInfoEntity noteInfo = noteInfoRepository.findByResourceId(msg.getResourceId())
+                .orElseThrow(() -> new ServiceException(NoteError.NOTE_NOT_FOUND));
+        if (noteInfo.getResourceType() != resourceType) {
+            throw new ServiceException(NoteError.CANNOT_SUPPORT_NOTE_RESOURCE_TYPE);
+        }
+
         NoteVersionEntity noteVersionEntity = NoteVersionEntity.builder()
-                .type(VersionType.valueOf(msg.getType()))
+                .type(msg.getType())
                 .data(new Binary(Base64.getDecoder().decode(msg.getData())))
-                .createdAt(LocalDateTime.now())
-                .createdBy(updatedBy)
+                .createdBy(authors)
                 .build();
         BeanUtils.copyProperties(msg, noteVersionEntity, "type","data");
         noteVersionRepository.save(noteVersionEntity);
 
-        updateNoteDocumentMetadata(msg, updatedBy);
-    }
-
-    private void updateNoteDocumentMetadata(NoteSnapshotMessage msg, List<Long> currentRoundAuthors) {
-        noteDocumentRepository.findByResourceId(msg.getResourceId()).ifPresent(noteInfo -> {
-            // 更新最后修改时间
-            noteInfo.setLastUpdatedAt(LocalDateTime.now());
-            if (currentRoundAuthors != null && !currentRoundAuthors.isEmpty()) {
-                // 将现有的作者和当前的作者合并，利用 CollUtil.distinct 自动去重
-                List<Long> existing = noteInfo.getAuthors() == null ? CollUtil.newArrayList() : noteInfo.getAuthors();
-                existing.addAll(currentRoundAuthors);
-                noteInfo.setAuthors(CollUtil.distinct(existing));
-            }
-            // 如果是 FULL 快照，顺便更新纯文本供 ES/全文检索使用
-            if (VersionType.FULL.name().equals(msg.getType()) && msg.getPlainText() != null) {
-                noteInfo.setPlainText(msg.getPlainText());
-            }
-            noteDocumentRepository.save(noteInfo);
-        });
+        // 更新最后修改时间
+        noteInfo.setUpdateTime(LocalDateTime.now());
+        noteInfo.setVersion(noteVersionEntity.getVersion());
+        if (authors != null && !authors.isEmpty()) {
+            // 将现有的作者和当前的作者合并，利用 CollUtil.distinct 自动去重
+            List<Long> existing = noteInfo.getAuthors() == null ? CollUtil.newArrayList() : noteInfo.getAuthors();
+            existing.addAll(authors);
+            noteInfo.setAuthors(CollUtil.distinct(existing));
+        }
+        // 如果是 FULL 快照，顺便更新纯文本供 ES/全文检索使用
+        if (VersionType.FULL == msg.getType() && msg.getPlainText() != null) {
+            noteContentRepository.save(NoteContentEntity.builder()
+                    .resourceId(noteVersionEntity.getResourceId())
+                    .version(noteVersionEntity.getVersion())
+                    .rawText(msg.getPlainText())
+                    .build());
+        }
+        noteInfoRepository.save(noteInfo);
     }
 
     @Override
     public NoteSnapshotResponse getLatestVersion(String resourceId) {
-        NoteInfoEntity noteInfoEntity = noteDocumentRepository.findByResourceId(resourceId)
+        NoteInfoEntity noteInfoEntity = noteInfoRepository.findByResourceId(resourceId)
                 .orElseThrow(() -> new ServiceException(NoteError.NOTE_NOT_FOUND));
         // 获取最后一个Full版本
         Optional<NoteVersionEntity> latestFullVersionEntity = noteVersionRepository
                 .findFirstByResourceIdAndTypeOrderByVersionDesc(resourceId, VersionType.FULL);
         // 完整版本的版本号
-        Long latestFullVersion = latestFullVersionEntity.map(NoteVersionEntity::getVersion).orElse(0L);
+        Integer latestFullVersion = latestFullVersionEntity.map(NoteVersionEntity::getVersion).orElse(0);
         // 获取在该 Full 版本之后的所有 DELTA 版本
         List<NoteVersionEntity> deltaVersionEntityList = noteVersionRepository
                 .findByResourceIdAndVersionGreaterThanAndTypeOrderByVersionAsc(resourceId, latestFullVersion, VersionType.DELTA);
@@ -83,7 +90,7 @@ public class NoteVersionServiceImpl implements INoteVersionService {
                 .map(e -> Base64.getEncoder().encodeToString(e.getData().getData()))
                 .toList();
         // 获取当前版本号
-        Long currentVersion = latestFullVersion;
+        Integer currentVersion = latestFullVersion;
         if (!deltaVersionEntityList.isEmpty()) {
             currentVersion = deltaVersionEntityList.getLast().getVersion();
         }
@@ -105,14 +112,14 @@ public class NoteVersionServiceImpl implements INoteVersionService {
     }
 
     @Override
-    public PageR<NoteVersionListResponse> listVersions(String resourceId, int page, int size) {
+    public PageR<NoteVersionInfoResponse> listVersions(String resourceId, int page, int size) {
         Pageable pageable = PageRequest.of(Math.max(page - 1, 0), size);
         Page<NoteVersionEntity> entityPage = noteVersionRepository.findByResourceIdOrderByVersionDesc(resourceId, pageable);
 
-        PageR<NoteVersionListResponse> pageR = new PageR<>(entityPage.getTotalElements(), page, size);
+        PageR<NoteVersionInfoResponse> pageR = new PageR<>(entityPage.getTotalElements(), page, size);
 
-        List<NoteVersionListResponse> responses = entityPage.getContent().stream().map(entity -> {
-            NoteVersionListResponse response = new NoteVersionListResponse();
+        List<NoteVersionInfoResponse> responses = entityPage.getContent().stream().map(entity -> {
+            NoteVersionInfoResponse response = new NoteVersionInfoResponse();
             BeanUtils.copyProperties(entity, response);
             return response;
         }).toList();

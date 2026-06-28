@@ -6,6 +6,6 @@ import lombok.EqualsAndHashCode;
 
 @EqualsAndHashCode(callSuper = true)
 @Data
-public class NoteVersionListResponse extends NoteVersionBase {
-    private String id;
+public class NoteVersionInfoResponse extends NoteVersionBase {
+    private Integer version;
 }

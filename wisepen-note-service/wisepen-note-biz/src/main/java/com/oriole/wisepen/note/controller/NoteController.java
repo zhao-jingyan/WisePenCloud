@@ -8,11 +8,13 @@ import com.oriole.wisepen.common.core.domain.enums.GroupRoleType;
 import com.oriole.wisepen.common.core.exception.ServiceException;
 import com.oriole.wisepen.common.log.annotation.Log;
 import com.oriole.wisepen.common.security.annotation.CheckLogin;
-import com.oriole.wisepen.note.api.domain.base.NoteInfoBase;
+import com.oriole.wisepen.note.api.domain.dto.req.NoteSnapshotSaveRequest;
 import com.oriole.wisepen.note.api.domain.dto.req.NoteCreateRequest;
 import com.oriole.wisepen.note.api.domain.dto.req.NoteForkRequest;
 import com.oriole.wisepen.note.api.domain.dto.res.NoteInfoResponse;
-import com.oriole.wisepen.note.api.domain.dto.res.NoteVersionListResponse;
+import com.oriole.wisepen.note.api.domain.dto.res.NoteVersionInfoResponse;
+import com.oriole.wisepen.note.api.domain.enums.VersionType;
+import com.oriole.wisepen.note.domain.entity.NoteInfoEntity;
 import com.oriole.wisepen.note.service.INoteService;
 import com.oriole.wisepen.note.service.INoteVersionService;
 import com.oriole.wisepen.resource.domain.dto.ResourceCheckPermissionReqDTO;
@@ -32,9 +34,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Map;
 
-import static com.oriole.wisepen.note.exception.NoteError.NOTE_NOT_FOUND;
 import static com.oriole.wisepen.note.exception.NoteError.NOTE_PERMISSION_DENIED;
 
 @Slf4j
@@ -53,11 +55,11 @@ public class NoteController {
     @Operation(
             summary = "创建笔记",
             description = """
-                    - 用途：为当前用户创建一份新的协同笔记资源。
-                    - 请求：title 为笔记标题。
-                    - 约束：当前用户必须已登录；title 必须是可用于展示的笔记标题。
-                    - 处理：调用资源服务注册 NOTE 类型资源，以当前用户作为所有者；随后创建笔记信息记录并将当前用户写入作者列表；不创建初始协同快照。
-                    - 失败：未登录 -> PermissionError.NOT_LOGIN；资源注册失败或笔记信息落库失败 -> NoteError.NOTE_REGISTER_RESOURCE_FAILED。
+                    - 用途：为当前用户创建一份新的笔记体系资源，可创建普通协同笔记或 Draw.io 图。
+                    - 请求：title 为资源标题；resourceType 可选，未传时按 NOTE 处理，允许 NOTE 或 DRAWIO。
+                    - 约束：当前用户必须已登录；title 必须是可用于展示的标题；resourceType 必须属于笔记服务支持的资源类型。
+                    - 处理：调用资源服务注册对应类型资源，以当前用户作为所有者；随后创建笔记信息记录并将当前用户写入作者列表；不创建初始快照。
+                    - 失败：未登录 -> PermissionError.NOT_LOGIN；资源类型不支持 -> NoteError.CANNOT_SUPPORT_NOTE_RESOURCE_TYPE；资源注册失败或笔记信息落库失败 -> NoteError.NOTE_REGISTER_RESOURCE_FAILED。
                     - 响应：返回新笔记的资源 ID。
                     """
     )
@@ -72,11 +74,11 @@ public class NoteController {
     @Operation(
             summary = "复制笔记",
             description = """
-                    - 用途：将当前用户拥有 FORK 动作的笔记复制为自己的新笔记资源。
-                    - 请求：resourceId 指定源笔记资源；forkedResourceVersion 可选，作为权限检查 targetVersion 并指定源笔记快照版本；forkedResourceName 指定新笔记资源名。
-                    - 约束：当前用户必须拥有源资源 FORK 动作；Market 来源授权必须传当前上架 offerVersion。
-                    - 处理：先调用资源服务实时校验 FORK 权限；创建新的 NOTE 资源和笔记元信息，并复制距离 targetVersion 版本最近的源 FULL 和 DELTA 快照。
-                    - 失败：未登录 -> PermissionError.NOT_LOGIN；源资源不是笔记或笔记不存在 -> NoteError.NOTE_NOT_FOUND；无 FORK 权限 -> NoteError.NOTE_PERMISSION_DENIED；资源注册失败 -> NoteError.NOTE_REGISTER_RESOURCE_FAILED；复制失败 -> NoteError.NOTE_FORK_FAILED。
+                    - 用途：将当前用户拥有 FORK 动作的笔记体系资源复制为自己的新资源。
+                    - 请求：resourceId 指定源笔记资源；forkedResourceVersion 可选，作为权限检查 targetVersion 并指定复制截止版本，未传时使用源笔记当前版本；forkedResourceName 指定新笔记资源名。
+                    - 约束：当前用户必须拥有源资源 FORK 动作；Market 来源授权必须传当前上架 offerVersion；源笔记元信息必须存在。
+                    - 处理：先调用资源服务实时校验 FORK 权限；服务层从源笔记元信息继承资源类型并注册新资源，复制截止版本前最近的 FULL 和后续 DELTA 快照，更新新笔记元信息版本为已复制版本中的最大值；DRAWIO 因只保存 FULL，通常只复制目标完整 XML 快照。
+                    - 失败：未登录 -> PermissionError.NOT_LOGIN；源笔记不存在 -> NoteError.NOTE_NOT_FOUND；无 FORK 权限 -> NoteError.NOTE_PERMISSION_DENIED；资源注册失败 -> NoteError.NOTE_REGISTER_RESOURCE_FAILED；复制失败 -> NoteError.NOTE_FORK_FAILED。
                     - 响应：返回新笔记资源 ID。
                     """
     )
@@ -96,12 +98,12 @@ public class NoteController {
     @Operation(
             summary = "获取笔记信息",
             description = """
-                    - 用途：获取笔记资源详情、笔记元信息和作者展示信息。
-                    - 请求：resourceId 指定笔记资源；targetVersion 可选，用于 Market 版本限定权限裁决。
+                    - 用途：获取笔记资源详情、当前版本号和作者展示信息。
+                    - 请求：resourceId 指定笔记资源；targetVersion 可选，仅用于 Market 版本限定权限裁决。
                     - 约束：当前用户必须已登录，且必须通过资源服务的资源详情权限校验；Market 来源查看必须传当前上架 offerVersion；目标笔记必须存在。
-                    - 处理：通过资源服务获取资源详情和当前用户动作集合，读取笔记信息，并尽量调用用户服务补充作者展示信息；作者展示信息补充失败时不阻断主响应。
+                    - 处理：通过资源服务获取资源详情和当前用户动作集合，读取笔记元信息中的当前版本号，并尽量调用用户服务补充作者展示信息；作者展示信息补充失败时不阻断主响应；不返回快照正文。
                     - 失败：未登录 -> PermissionError.NOT_LOGIN；资源不存在 -> ResourceError.RESOURCE_NOT_FOUND；资源无查看权限 -> ResourceError.RESOURCE_PERMISSION_DENIED；笔记不存在 -> NoteError.NOTE_NOT_FOUND。
-                    - 响应：返回资源信息、笔记信息和可用的作者展示信息。
+                    - 响应：返回资源信息、当前版本号和可用的作者展示信息。
                     """
     )
     @GetMapping("/getNoteInfo")
@@ -111,7 +113,7 @@ public class NoteController {
         ResourceItemResponse resourceInfo = remoteResourceService.getResourceInfo(new ResourceInfoGetReqDTO(
                 resourceId, SecurityContextHolder.getUserId(), SecurityContextHolder.getGroupRoleMap(), targetVersion
         )).getData();
-        NoteInfoBase noteInfo = noteService.getNoteInfo(resourceId);
+        NoteInfoEntity noteInfo = noteService.getNoteInfo(resourceId);
 
         Map<Long, UserDisplayBase> authorsDisplay = null;
         try {
@@ -121,10 +123,37 @@ public class NoteController {
 
         NoteInfoResponse noteInfoResponse = NoteInfoResponse.builder()
                 .resourceInfo(resourceInfo)
-                .noteInfo(noteInfo)
+                .version(noteInfo.getVersion())
                 .authorsDisplay(authorsDisplay)
                 .build();
         return R.ok(noteInfoResponse);
+    }
+
+    @Operation(
+            summary = "保存 Draw.io 笔记内容",
+            description = """
+                    - 用途：保存 Draw.io 图的完整 XML 快照，生成笔记体系资源的新版本。
+                    - 请求：resourceId 指定 DRAWIO 资源；version 是本次要写入的快照版本号；data 是完整 Draw.io XML 的 Base64；plainText 可选，用于搜索摘要；type 会在入口被强制为 FULL。
+                    - 约束：当前用户必须拥有目标资源 EDIT 动作；目标资源类型必须是 DRAWIO；version 应是该资源下尚未使用的新版本号。
+                    - 处理：强制按 FULL 快照保存版本数据，更新笔记元信息中的当前版本和作者列表；plainText 非空时写入笔记内容摘要；不发送协同快照消息，不写 DELTA，不经过对象存储。
+                    - 失败：未登录 -> PermissionError.NOT_LOGIN；无 EDIT 权限 -> NoteError.NOTE_PERMISSION_DENIED；笔记不存在 -> NoteError.NOTE_NOT_FOUND；资源类型不支持 -> NoteError.CANNOT_SUPPORT_NOTE_RESOURCE_TYPE。
+                    - 响应：成功时返回空结果。
+                    """
+    )
+    @Log(title = "保存DrawIO笔记内容", businessType = BusinessType.UPDATE)
+    @PostMapping("/saveDrawIOSnapshot")
+    public R<Void> saveDrawIOSnapshot(@Validated @RequestBody NoteSnapshotSaveRequest request) {
+        Long userId = SecurityContextHolder.getUserId();
+        Map<Long, GroupRoleType> groupRoles = SecurityContextHolder.getGroupRoleMap();
+        ResourceCheckPermissionResDTO permission = remoteResourceService.checkResPermission(
+                ResourceCheckPermissionReqDTO.builder().resourceId(request.getResourceId()).userId(userId).groupRoles(groupRoles).build()).getData();
+        if (permission == null || permission.getAllowedActions() == null || !permission.getAllowedActions().contains(ResourceAction.EDIT)) {
+            throw new ServiceException(NOTE_PERMISSION_DENIED);
+        }
+        // 必须是FULL
+        request.setType(VersionType.FULL);
+        noteVersionService.createVersion(request, List.of(userId), ResourceType.DRAWIO);
+        return R.ok();
     }
 
     @Operation(
@@ -138,8 +167,8 @@ public class NoteController {
                     - 响应：返回分页版本摘要列表和总数。
                     """
     )
-    @GetMapping("/listNoteHistoryVersions")
-    public R<PageR<NoteVersionListResponse>> listNoteHistoryVersions(
+    @GetMapping("/listNoteVersions")
+    public R<PageR<NoteVersionInfoResponse>> listNoteVersions(
             @RequestParam String resourceId,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size) {
@@ -148,8 +177,7 @@ public class NoteController {
         if (permission == null || permission.getResourceAccessRole() != ResourceAccessRole.OWNER) {
             throw new ServiceException(NOTE_PERMISSION_DENIED);
         }
-        PageR<NoteVersionListResponse> noteVersionListResponses = noteVersionService.listVersions(resourceId, page, size);
-        return R.ok(noteVersionListResponses);
+        return R.ok(noteVersionService.listVersions(resourceId, page, size));
     }
 
     @Operation(

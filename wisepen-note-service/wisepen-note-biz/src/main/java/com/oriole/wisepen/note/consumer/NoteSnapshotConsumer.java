@@ -4,10 +4,13 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.oriole.wisepen.note.api.domain.mq.NoteSnapshotMessage;
 import com.oriole.wisepen.note.service.INoteVersionService;
+import com.oriole.wisepen.resource.enums.ResourceType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
+
+import java.util.List;
 
 import static com.oriole.wisepen.note.api.constant.MqTopicConstants.TOPIC_NOTE_SNAPSHOT;
 
@@ -32,7 +35,8 @@ public class NoteSnapshotConsumer {
         log.info("note snapshot event received. topic={} resourceId={} version={} type={}",
                 TOPIC_NOTE_SNAPSHOT, msg.getResourceId(), msg.getVersion(), msg.getType());
         try {
-            noteVersionService.createVersion(msg);
+            List<Long> currentRoundAuthors = msg.getUpdatedBy() != null ? msg.getUpdatedBy().stream().map(Long::valueOf).toList() : null;
+            noteVersionService.createVersion(msg, currentRoundAuthors, ResourceType.NOTE);
             log.debug("note snapshot event consumed. topic={} resourceId={} version={}",
                     TOPIC_NOTE_SNAPSHOT, msg.getResourceId(), msg.getVersion());
         } catch (Exception e) {

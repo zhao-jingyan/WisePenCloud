@@ -1,6 +1,5 @@
 package com.oriole.wisepen.note.api.domain.dto.res;
 
-import com.oriole.wisepen.note.api.domain.base.NoteInfoBase;
 import com.oriole.wisepen.resource.domain.dto.res.ResourceItemResponse;
 import com.oriole.wisepen.user.api.domain.base.UserDisplayBase;
 import lombok.AllArgsConstructor;
@@ -16,6 +15,6 @@ import java.util.Map;
 @AllArgsConstructor
 public class NoteInfoResponse {
     ResourceItemResponse resourceInfo;
-    NoteInfoBase noteInfo;
+    private Integer version;
     Map<Long, UserDisplayBase> authorsDisplay;
 }

@@ -1,24 +1,36 @@
 package com.oriole.wisepen.note.domain.entity;
 
-import com.oriole.wisepen.note.api.domain.base.NoteInfoBase;
+import com.oriole.wisepen.resource.enums.ResourceType;
 import lombok.AllArgsConstructor;
 import lombok.Data;
-import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
+import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.mongodb.core.mapping.Document;
 
-@EqualsAndHashCode(callSuper = true)
+import java.time.LocalDateTime;
+import java.util.List;
+
 @Data
 @SuperBuilder
 @NoArgsConstructor
 @AllArgsConstructor
 @Document(collection = "note_documents")
-public class NoteInfoEntity extends NoteInfoBase {
+public class NoteInfoEntity {
     @Id
     private String resourceId;
 
-    /** FULL 检查点时 Node 提取的纯文本，用于全文检索 */
-    private String plainText;
+    private ResourceType resourceType;
+
+    private Integer version;
+
+    private List<Long> authors;
+
+    @CreatedDate
+    private LocalDateTime createTime;
+
+    @LastModifiedDate
+    private LocalDateTime updateTime;
 }
