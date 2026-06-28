@@ -29,8 +29,8 @@ public enum SearchScope {
             case ALL -> Arrays.stream(ResourceType.values())
                     .filter(t -> t != ResourceType.UNKNOWN)
                     .collect(Collectors.toList());
-            case DOCUMENT -> new ArrayList<>(EnumSet.complementOf(EnumSet.of(ResourceType.NOTE, ResourceType.UNKNOWN)));
-            case NOTE -> List.of(ResourceType.NOTE);
+            case DOCUMENT -> List.of(ResourceType.PDF, ResourceType.DOC, ResourceType.DOCX, ResourceType.PPT, ResourceType.PPTX, ResourceType.XLS, ResourceType.XLSX);
+            case NOTE -> List.of(ResourceType.NOTE, ResourceType.DRAWIO);
         };
     }
 }

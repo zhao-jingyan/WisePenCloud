@@ -17,19 +17,27 @@ import java.util.Map;
 @AllArgsConstructor
 public enum ResourceType {
 
-    /** 无扩展名的笔记，由笔记服务管理，不经过文件上传流程 */
-    NOTE(10, "NOTE", "note"),
+    /** 无扩展名的笔记，由笔记服务管理 */
+    NOTE(11, "NOTE", "note"),
+    /** Draw.io 图，由笔记服务管理 */
+    DRAWIO(12, "DRAWIO", "drawio"),
+
+    /** PDF 文件，由文档服务管理 */
     PDF(21, "PDF", "pdf"),
+    /** Office 文件，由文档服务管理 */
     DOC(22, "DOC", "doc"),
     DOCX(23, "DOCX", "docx"),
     PPT(24, "PPT", "ppt"),
     PPTX(25, "PPTX", "pptx"),
     XLS(26, "XLS", "xls"),
     XLSX(27, "XLSX", "xlsx"),
+
     /** 无扩展名的 Skill，由 AI资产 服务管理 */
     SKILL(31, "SKILL", "skill"),
     /** 无扩展名的 Agent，由 AI资产 服务管理 */
     AGENT(32, "AGENT", "agent"),
+
+    /** 未知资源，兜底 */
     UNKNOWN(99, "UNKNOWN", "unknown");
 
     private final int code;
