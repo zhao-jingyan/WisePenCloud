@@ -23,6 +23,7 @@ import com.oriole.wisepen.resource.repository.MarketOrderRepository;
 import com.oriole.wisepen.resource.repository.ResourceItemRepository;
 import com.oriole.wisepen.resource.service.IMarketService;
 import com.oriole.wisepen.resource.service.IResourceService;
+import com.oriole.wisepen.resource.service.ISearchSyncService;
 import com.oriole.wisepen.user.api.domain.base.GroupDisplayBase;
 import com.oriole.wisepen.user.api.domain.dto.req.WalletSettleCoinTradeRequest;
 import com.oriole.wisepen.user.api.feign.RemoteUserService;
@@ -52,6 +53,7 @@ public class MarketServiceImpl implements IMarketService {
     private final IResourceEventPublisher resourceEventPublisher;
     private final RemoteUserService remoteUserService;
     private final RemoteWalletService remoteWalletService;
+    private final ISearchSyncService searchSyncService;
 
 
     @Override
@@ -80,6 +82,7 @@ public class MarketServiceImpl implements IMarketService {
         groupBind.setTagIds(request.getTagIds());
 
         MarketSaleInfo marketSaleInfo = groupBind.getMarketSaleInfo() == null ? new MarketSaleInfo() : groupBind.getMarketSaleInfo();
+        Integer oldOfferVersion = marketSaleInfo.getOfferVersion();
 
         if (marketSaleInfo.getStatus() == MarketSaleStatus.BANNED) { // 被禁的资源不能上架
             throw new ServiceException(ResourceError.CANNOT_REPUBLISH_BANNED_MARKET_SALE);
@@ -108,15 +111,20 @@ public class MarketServiceImpl implements IMarketService {
         }
         marketSaleInfo.setMarketSaleTiers(marketSaleTiers);
 
+        String aclRecalculateReason = null;
         if ((marketSaleInfo.getStatus() == MarketSaleStatus.PUBLISHED || marketSaleInfo.getStatus() == MarketSaleStatus.OFF_SHELF)
-                && Objects.equals(marketSaleInfo.getOfferVersion(), request.getOfferVersion())) {
-            marketSaleInfo.setStatus(MarketSaleStatus.PUBLISHED); // 如果此前是已发布或下架状态，且没有改变上架的版本，则直接上架
+                && Objects.equals(oldOfferVersion, request.getOfferVersion())) {
+            // 如果此前是已发布或下架状态，且没有改变上架的版本，则直接上架
+            aclRecalculateReason = "MARKET_SALE_INFO_PUBLISHED"; // 上架时重算 ACL
+            marketSaleInfo.setStatus(MarketSaleStatus.PUBLISHED);
             // 解除限制
             if (resource.getOverrideGrantedActionsMask() != null) resource.getOverrideGrantedActionsMask().remove(marketGroupId);
-        } else {
-            // 否则需要审核
-            marketSaleInfo.setOfferVersion(request.getOfferVersion());
+        } else { // 否则需要审核
+            if (marketSaleInfo.getStatus() == MarketSaleStatus.PUBLISHED) {
+                aclRecalculateReason = "MARKET_SALE_INFO_OFF_SHELF"; // 如果此前是已发布状态，此操作将导致下架
+            }
             marketSaleInfo.setStatus(MarketSaleStatus.PENDING_REVIEW);
+            marketSaleInfo.setOfferVersion(request.getOfferVersion());
             // 清空上次审核信息
             marketSaleInfo.setAuditorId(null);
             marketSaleInfo.setAuditMessage(null);
@@ -129,9 +137,15 @@ public class MarketServiceImpl implements IMarketService {
         resource.setGroupBinds(groupBinds);
         resourceItemRepository.save(resource);
 
-        if (marketSaleInfo.getStatus() == MarketSaleStatus.PUBLISHED) { // 如果为发布状态，则触发 ACL 重算，否则不触发
-            resourceEventPublisher.publishAclRecalculateEvent(resource.getResourceId(), "MARKET_SALE_INFO_PUBLISHED");
+        if (StringUtils.hasText(aclRecalculateReason)) { // 如果 ACL 重算原因不为空，则触发 ACL 重算，否则不触发
+            resourceEventPublisher.publishAclRecalculateEvent(resource.getResourceId(), aclRecalculateReason);
         }
+
+        if (oldOfferVersion != null && !Objects.equals(oldOfferVersion, marketSaleInfo.getOfferVersion())) { // 变更版本时删除旧版本索引
+            searchSyncService.deleteMarketResourceIndex(resource.getResourceId(), marketGroupId, oldOfferVersion);
+        }
+        // 同步版本索引
+        searchSyncService.syncMarketResourceIndex(resource, marketGroupId);
 
         log.info("market sale info submitted. resourceId={} marketGroupId={} offerVersion={}",
                 resource.getResourceId(), marketGroupId, request.getOfferVersion());
@@ -156,6 +170,7 @@ public class MarketServiceImpl implements IMarketService {
 
         resourceItemRepository.save(resource);
         resourceEventPublisher.publishAclRecalculateEvent(resource.getResourceId(), "MARKET_SALE_INFO_OFF_SHELF");
+        searchSyncService.syncMarketResourceIndex(resource, marketGroupId);
         log.info("market sale info off-shelved. resourceId={} marketGroupId={}", resource.getResourceId(), marketGroupId);
     }
 
@@ -199,6 +214,7 @@ public class MarketServiceImpl implements IMarketService {
             // 如果改变前为发布状态（说明是新下架），则触发 ACL 重算
             resourceEventPublisher.publishAclRecalculateEvent(resource.getResourceId(), "MARKET_SALE_INFO_OFF_SHELF");
         }
+        searchSyncService.syncMarketResourceIndex(resource, marketGroupId);
 
         log.info("market sale info audited. resourceId={} operatorId={} marketGroupId={} status={} offerVersion={}",
                 resource.getResourceId(), operatorId, marketGroupId, request.getStatus(), marketSaleInfo.getOfferVersion());

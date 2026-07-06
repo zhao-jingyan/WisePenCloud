@@ -44,7 +44,7 @@ import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.stereotype.Service;
 
-import org.springframework.transaction.event.TransactionalEventListener;
+import org.springframework.context.event.EventListener;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
@@ -79,7 +79,7 @@ public class ResourceServiceImpl implements IResourceService {
 
     private final ResourceItemResponseAssembler resourceItemResponseAssembler;
 
-    @TransactionalEventListener
+    @EventListener
     public void handleTagTrashedEvent(TagTrashedEvent event) {
         int tagCount = event.getTrashedTagIds() == null ? 0 : event.getTrashedTagIds().size();
         log.info("tag trashed event received. tagCount={} tagIds={}",
@@ -92,7 +92,7 @@ public class ResourceServiceImpl implements IResourceService {
         }
     }
 
-    @TransactionalEventListener
+    @EventListener
     public void handleTagChangedEvent(TagChangedEvent event) {
         int tagCount = event.getChangedTagIds() == null ? 0 : event.getChangedTagIds().size();
         log.info("tag changed event received. tagCount={} tagIds={} isPersonalTag={}",
@@ -105,7 +105,7 @@ public class ResourceServiceImpl implements IResourceService {
         }
     }
 
-    @TransactionalEventListener
+    @EventListener
     public void handleTagDeletedEvent(TagDeletedEvent event) {
         int tagCount = event.getDeletedTagIds() == null ? 0 : event.getDeletedTagIds().size();
         log.info("tag deleted event received. tagCount={} tagIds={} isPathTag={}",
@@ -198,6 +198,11 @@ public class ResourceServiceImpl implements IResourceService {
         // 检查目标路径是否属于回收站
         if (tagService.isNodeInTrash(groupId, pathTags.getFirst().getTagId()) != ITagService.TagType.NOT_IN_TRASH) {
             isTrashed = true;
+            // 移入回收站会卸载除了个人组的所有节点，如果此前有发布到市场，则还需移除市场索引
+            entity.getGroupBinds().stream()
+                    .filter(bind -> bind.getMarketSaleInfo() != null)
+                    .forEach(bind -> searchSyncService.deleteMarketResourceIndexesByResourceIdAndMarketGroupId(
+                            entity.getResourceId(), bind.getGroupId()));
             entity.getGroupBinds().removeIf(bind -> !bind.getGroupId().startsWith(ResourceConstants.PERSONAL_GROUP_PREFIX));
             entity.setOverrideGrantedActionsMask(null);
             entity.setSpecifiedUsersGrantedActionsMask(null);
@@ -415,6 +420,10 @@ public class ResourceServiceImpl implements IResourceService {
         for (ResourceItemEntity entity : entities) {
             entity.setDeletedAt(LocalDateTime.now());
             mongoTemplate.save(entity, RESOURCE_TRASH_COLLECTION); // 插入到回收集合（用于审计）中
+            // 软删除时删除搜索索引，以避免可以被搜索到
+            searchSyncService.deleteResourceIndex(entity.getResourceId());
+            searchSyncService.deleteMarketResourceIndexesByResourceId(entity.getResourceId());
+
         }
         resourceItemRepository.deleteAllById(resourceIds);// 从业务表中物理擦除
         log.info("resources deleted. mode=soft count={} resourceIds={}",
@@ -464,11 +473,6 @@ public class ResourceServiceImpl implements IResourceService {
             }
             // 清理资源对应的收藏行为记录表
             favoriteResourceRefRepository.deleteByResourceIdIn(deletedResourceIds);
-
-            // 删除搜索索引
-            for (ResourceItemEntity resource : expiredResources) {
-                searchSyncService.deleteResourceIndex(resource.getResourceId());
-            }
 
             log.info("resources deleted. mode=hard count={} resourceIds={}",
                     deletedCount, summarizeIds(resourceIds));
@@ -523,6 +527,9 @@ public class ResourceServiceImpl implements IResourceService {
                 // 插入到回收集合（用于审计）中
                 entity.setDeletedAt(LocalDateTime.now());
                 mongoTemplate.save(entity, RESOURCE_TRASH_COLLECTION);
+                // 软删除时删除搜索索引，以避免可以被搜索到
+                searchSyncService.deleteResourceIndex(entity.getResourceId());
+                searchSyncService.deleteMarketResourceIndexesByResourceId(entity.getResourceId());
             }
             // 从业务表中物理擦除
             resourceItemRepository.deleteAll(affectedBinds);
@@ -551,6 +558,8 @@ public class ResourceServiceImpl implements IResourceService {
                                 iterator.remove();
                             } else { // 集市组保留绑定，但走下架流程
                                 entity.offShelfMarketSaleInfo(groupBind.getGroupId());
+                                // 同步集市组搜索
+                                searchSyncService.syncMarketResourceIndex(entity, groupBind.getGroupId());
                             }
                         }
                     }
@@ -576,6 +585,11 @@ public class ResourceServiceImpl implements IResourceService {
 
         if (!affectedResources.isEmpty()) {
             for (ResourceItemEntity entity : affectedResources) {
+                // 移入回收站会卸载除了个人组的所有节点，如果此前有发布到市场，则还需移除市场索引
+                entity.getGroupBinds().stream()
+                        .filter(bind -> bind.getMarketSaleInfo() != null)
+                        .forEach(bind -> searchSyncService.deleteMarketResourceIndexesByResourceIdAndMarketGroupId(
+                                entity.getResourceId(), bind.getGroupId()));
                 entity.getGroupBinds().removeIf(bind -> !bind.getGroupId().startsWith(ResourceConstants.PERSONAL_GROUP_PREFIX));
                 entity.setOverrideGrantedActionsMask(null);
                 entity.setSpecifiedUsersGrantedActionsMask(null);

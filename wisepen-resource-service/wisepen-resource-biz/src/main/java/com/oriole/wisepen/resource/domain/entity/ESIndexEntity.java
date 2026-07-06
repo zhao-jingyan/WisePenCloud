@@ -80,6 +80,7 @@ public class ESIndexEntity {
     public ESIndexEntity(String resourceId, String content) {
         this.resourceId = resourceId;
         this.content = HtmlUtils.htmlEscape(content);
+        this.updateTime = LocalDateTime.now();
     }
 
     public ESIndexEntity(ResourceItemEntity entity) {
