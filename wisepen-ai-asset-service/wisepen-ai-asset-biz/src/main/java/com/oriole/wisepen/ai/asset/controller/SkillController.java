@@ -23,6 +23,8 @@ import com.oriole.wisepen.common.core.exception.ServiceException;
 import com.oriole.wisepen.common.log.annotation.Log;
 import com.oriole.wisepen.common.security.annotation.CheckLogin;
 import com.oriole.wisepen.file.storage.api.domain.dto.StsTokenDTO;
+import com.oriole.wisepen.file.storage.api.enums.StorageSceneEnum;
+import com.oriole.wisepen.file.storage.api.feign.RemoteStorageService;
 import com.oriole.wisepen.resource.domain.dto.ResourceCheckPermissionReqDTO;
 import com.oriole.wisepen.resource.domain.dto.ResourceCheckPermissionResDTO;
 import com.oriole.wisepen.resource.domain.dto.ResourceInfoGetReqDTO;
@@ -44,6 +46,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Map;
 
+import static com.oriole.wisepen.ai.asset.constant.AIAssetConstants.ASSET_STS_TOKEN_DURATION_SECONDS;
+
 @Tag(name = "技能资产", description = "技能资产创建、资料维护、版本发布和草稿文件管理")
 @RestController
 @RequestMapping("/skill")
@@ -54,6 +58,7 @@ public class SkillController {
     private final SkillServiceImpl skillService;
     private final SkillVersionServiceImpl skillVersionService;
     private final RemoteResourceService remoteResourceService;
+    private final RemoteStorageService remoteStorageService;
 
     @Operation(
             summary = "创建技能资产",
@@ -145,9 +150,9 @@ public class SkillController {
             description = """
                     - 用途：查询技能资产指定版本或当前已发布版本的文件快照。
                     - 请求：resourceId 指定技能资产；version 为空时使用技能主档当前发布版本。
-                    - 约束：当前用户必须拥有目标资源 VIEW 动作；非所有者只能读取已发布版本；技能资产和目标版本必须存在。
+                    - 约束：当前用户必须拥有目标资源 VIEW 动作；技能资产和目标版本必须存在。
                     - 处理：确定目标版本后读取版本记录及其资产文件列表；不生成下载地址，不改变草稿或发布状态。
-                    - 失败：未登录 -> PermissionError.NOT_LOGIN；资源无查看权限或非所有者请求未发布版本 -> AIResourceError.AI_RESOURCE_PERMISSION_DENIED；技能不存在 -> AIResourceError.AI_RESOURCE_NOT_FOUND；版本不存在 -> AIResourceError.AI_RESOURCE_VERSION_NOT_FOUND。
+                    - 失败：未登录 -> PermissionError.NOT_LOGIN；资源无查看权限 -> AIResourceError.AI_RESOURCE_PERMISSION_DENIED；技能不存在 -> AIResourceError.AI_RESOURCE_NOT_FOUND；版本不存在 -> AIResourceError.AI_RESOURCE_VERSION_NOT_FOUND。
                     - 响应：返回技能版本包信息和资产文件元数据。
                     """
     )
@@ -173,7 +178,10 @@ public class SkillController {
     public R<StsTokenDTO> getSkillAssetStsToken(@RequestParam String resourceId,
                                                 @RequestParam(value = "targetVersion", required = false) Integer targetVersion) {
         assertSkillReadable(resourceId, targetVersion);
-        return R.ok(skillVersionService.getAssetStsToken(resourceId));
+        StsTokenDTO stsToken = remoteStorageService.getStsToken(
+                StorageSceneEnum.PRIVATE_SKILL_ASSET, resourceId, null, ASSET_STS_TOKEN_DURATION_SECONDS
+        ).getData();
+        return R.ok(stsToken);
     }
 
     @Operation(
@@ -244,22 +252,7 @@ public class SkillController {
     private void assertSkillReadable(String resourceId, Integer targetVersion) {
         ResourceCheckPermissionResDTO permission = remoteResourceService.checkResPermission(ResourceCheckPermissionReqDTO.builder()
                 .resourceId(resourceId).userId(SecurityContextHolder.getUserId()).groupRoles(SecurityContextHolder.getGroupRoleMap()).targetVersion(targetVersion).build()).getData();
-        boolean isOwner = permission != null && permission.getResourceAccessRole() == ResourceAccessRole.OWNER;
-        boolean canView = permission != null && permission.getAllowedActions() != null
-                && permission.getAllowedActions().contains(ResourceAction.VIEW);
-        if (!isOwner && !canView) {
-            throw new ServiceException(AIResourceError.AI_RESOURCE_PERMISSION_DENIED);
-        }
-        AIResourceInfoBase skillInfo = skillService.getAIResourceInfo(resourceId);
-        if (!isOwner) {
-            assertPublishedVersionReadable(skillInfo, targetVersion);
-        }
-    }
-
-    private void assertPublishedVersionReadable(AIResourceInfoBase skillInfo, Integer targetVersion) {
-        int publishedVersion = skillInfo.getVersion() == null ? 0 : skillInfo.getVersion();
-        int requestedVersion = targetVersion == null ? publishedVersion : targetVersion;
-        if (requestedVersion <= 0 || requestedVersion > publishedVersion) {
+        if (permission == null || permission.getAllowedActions() == null || !permission.getAllowedActions().contains(ResourceAction.VIEW)) {
             throw new ServiceException(AIResourceError.AI_RESOURCE_PERMISSION_DENIED);
         }
     }

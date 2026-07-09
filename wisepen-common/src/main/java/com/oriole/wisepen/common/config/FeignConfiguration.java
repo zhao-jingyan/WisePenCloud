@@ -53,16 +53,13 @@ public class FeignConfiguration {
                     return LocalDateTime.ofInstant(Instant.ofEpochMilli(parser.getLongValue()), ZoneId.systemDefault());
                 }
                 String value = parser.getValueAsString();
-                if (value == null || value.isBlank()) {
-                    return null;
-                }
+                if (value == null || value.isBlank()) return null;
                 if (value.chars().allMatch(Character::isDigit)) {
                     return LocalDateTime.ofInstant(Instant.ofEpochMilli(Long.parseLong(value)), ZoneId.systemDefault());
                 }
                 return LocalDateTime.parse(value, DateTimeFormatter.ISO_LOCAL_DATE_TIME);
             }
         });
-        // 先注册自定义 JavaTimeModule，避免默认 LocalDateTime 反序列化器抢先处理毫秒时间戳。
         objectMapper.registerModule(javaTimeModule);
         objectMapper.findAndRegisterModules();
         // 禁用将日期序列化为时间戳

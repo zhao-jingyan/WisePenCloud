@@ -19,7 +19,6 @@ import com.oriole.wisepen.ai.asset.service.IVersionService;
 import com.oriole.wisepen.common.core.exception.ServiceException;
 import com.oriole.wisepen.file.storage.api.domain.dto.CopyReqDTO;
 import com.oriole.wisepen.file.storage.api.domain.dto.StorageRecordDTO;
-import com.oriole.wisepen.file.storage.api.domain.dto.StsTokenDTO;
 import com.oriole.wisepen.file.storage.api.domain.dto.UploadInitReqDTO;
 import com.oriole.wisepen.file.storage.api.domain.dto.UploadInitRespDTO;
 import com.oriole.wisepen.file.storage.api.domain.mq.FileUploadedMessage;
@@ -37,7 +36,6 @@ import java.util.*;
 public abstract class VersionServiceImpl<VT extends VersionBundleBaseEntity<VT>, AT extends AIResourceBaseEntity<AT>> implements IVersionService<VT> {
 
     private static final String ROOT_PATH = "/";
-    private static final long ASSET_STS_TOKEN_DURATION_SECONDS = 3600L;
 
     final VersionBundleBaseRepository<VT> versionBundleBaseRepository;
     final AIResourceBaseRepository<AT> aiResourceBaseRepository;
@@ -138,16 +136,6 @@ public abstract class VersionServiceImpl<VT extends VersionBundleBaseEntity<VT>,
         }
         return versionBundleBaseRepository.findByResourceIdAndVersion(resourceId, version)
                 .orElseThrow(() -> new ServiceException(AIResourceError.AI_RESOURCE_VERSION_NOT_FOUND));
-    }
-
-    @Override
-    public StsTokenDTO getAssetStsToken(String resourceId) {
-        return remoteStorageService.getStsToken(
-                getStorageScene(),
-                resourceId,
-                null,
-                ASSET_STS_TOKEN_DURATION_SECONDS
-        ).getData();
     }
 
     @Override

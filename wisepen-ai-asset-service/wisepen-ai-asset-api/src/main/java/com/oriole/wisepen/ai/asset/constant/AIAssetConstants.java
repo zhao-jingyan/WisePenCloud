@@ -9,4 +9,5 @@ public interface AIAssetConstants {
             ResourceType.SKILL,
             ResourceType.AGENT
     );
+    public static final long ASSET_STS_TOKEN_DURATION_SECONDS = 3600L;
 }
