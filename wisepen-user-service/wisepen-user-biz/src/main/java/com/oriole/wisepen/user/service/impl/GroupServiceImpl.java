@@ -120,7 +120,9 @@ public class GroupServiceImpl implements IGroupService {
 
         LambdaQueryWrapper<GroupMemberEntity> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(GroupMemberEntity::getUserId, userId);
-        if (groupRoleFilter == GroupRoleFilter.MANAGED) {
+        if (groupRoleFilter == GroupRoleFilter.ALL) {
+            wrapper.in(GroupMemberEntity::getRole, GroupRoleType.ADMIN, GroupRoleType.OWNER, GroupRoleType.MEMBER);
+        } else if (groupRoleFilter == GroupRoleFilter.MANAGED) {
             wrapper.in(GroupMemberEntity::getRole, GroupRoleType.ADMIN, GroupRoleType.OWNER);
         } else {
             wrapper.in(GroupMemberEntity::getRole, GroupRoleType.MEMBER);

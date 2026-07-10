@@ -127,8 +127,8 @@ public class GroupController {
 	@Operation(
 			summary = "分页查询小组列表",
 			description = """
-					- 用途：查询当前用户加入或管理的小组列表。
-					- 请求：groupRoleFilter 指定查询成员小组或管理小组；page 和 size 控制分页。
+					- 用途：查询当前用户加入、管理或全部所属的小组列表。
+					- 请求：groupRoleFilter 指定查询全部小组、成员小组或管理小组；page 和 size 控制分页。
 					- 约束：当前用户必须已登录。
 					- 处理：按当前用户在小组中的角色过滤成员关系，分页读取小组记录并补充小组 OWNER 展示信息。
 					- 失败：未登录 -> PermissionError.NOT_LOGIN。

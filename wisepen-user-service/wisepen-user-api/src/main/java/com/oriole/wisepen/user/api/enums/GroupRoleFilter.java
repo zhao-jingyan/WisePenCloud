@@ -8,6 +8,7 @@ import lombok.Getter;
 @Getter
 @AllArgsConstructor
 public enum GroupRoleFilter {
+    ALL(0,"ALL"),
     JOINED(1,"JOINED"),
     MANAGED(2,"MANAGED");
 
