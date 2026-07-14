@@ -27,7 +27,7 @@ public class InternalAgentController {
 
 
     @GetMapping("/getAgentByResourceId")
-    public R<AgentInfoResponse> getPublishedAgentByResourceId(@RequestParam String resourceId, @RequestParam(required = false) Integer agentVersion) {
+    public R<AgentInfoResponse> getAgentByResourceId(@RequestParam String resourceId, @RequestParam(required = false) Integer agentVersion) {
         AIResourceInfoBase agent = agentService.getAIResourceInfo(resourceId);
         if (agentVersion == null) agentVersion = agent.getVersion();
         if (agentVersion <= 0) {

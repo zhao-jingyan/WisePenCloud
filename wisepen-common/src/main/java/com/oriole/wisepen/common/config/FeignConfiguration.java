@@ -1,6 +1,10 @@
 package com.oriole.wisepen.common.config;
 
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.core.JsonToken;
+import com.fasterxml.jackson.databind.DeserializationContext;
 import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.JsonDeserializer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
@@ -19,6 +23,12 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
 
+import java.io.IOException;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+
 @Configuration
 @EnableFeignClients(basePackages = "com.oriole.wisepen")
 public class FeignConfiguration {
@@ -35,6 +45,22 @@ public class FeignConfiguration {
 
     private ObjectMapper feignObjectMapper() {
         ObjectMapper objectMapper = new ObjectMapper();
+        JavaTimeModule javaTimeModule = new JavaTimeModule();
+        javaTimeModule.addDeserializer(LocalDateTime.class, new JsonDeserializer<>() {
+            @Override
+            public LocalDateTime deserialize(JsonParser parser, DeserializationContext context) throws IOException {
+                if (parser.currentToken() == JsonToken.VALUE_NUMBER_INT) {
+                    return LocalDateTime.ofInstant(Instant.ofEpochMilli(parser.getLongValue()), ZoneId.systemDefault());
+                }
+                String value = parser.getValueAsString();
+                if (value == null || value.isBlank()) return null;
+                if (value.chars().allMatch(Character::isDigit)) {
+                    return LocalDateTime.ofInstant(Instant.ofEpochMilli(Long.parseLong(value)), ZoneId.systemDefault());
+                }
+                return LocalDateTime.parse(value, DateTimeFormatter.ISO_LOCAL_DATE_TIME);
+            }
+        });
+        objectMapper.registerModule(javaTimeModule);
         objectMapper.findAndRegisterModules();
         // 禁用将日期序列化为时间戳
         objectMapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);

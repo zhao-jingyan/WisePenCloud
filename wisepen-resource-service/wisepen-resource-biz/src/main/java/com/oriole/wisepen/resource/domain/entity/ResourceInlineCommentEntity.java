@@ -22,7 +22,7 @@ import java.util.List;
 @AllArgsConstructor
 @Document(collection = "wisepen_resource_inline_comments")
 @CompoundIndexes({
-        @CompoundIndex(def = "{'resourceId': 1, 'deletedAt': 1, 'resolved': 1, 'updateTime': -1}"),
+        @CompoundIndex(def = "{'resourceId': 1, 'resolved': 1, 'updateTime': -1}"),
         @CompoundIndex(def = "{'resourceId': 1, 'applicableFromVersion': 1, 'applicableToVersion': 1}"),
         @CompoundIndex(def = "{'resourceId': 1, 'anchorRef.externalAnchorId': 1}")
 })

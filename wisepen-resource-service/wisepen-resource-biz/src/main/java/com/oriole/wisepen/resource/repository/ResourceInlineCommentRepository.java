@@ -8,6 +8,6 @@ import java.util.Optional;
 
 public interface ResourceInlineCommentRepository extends MongoRepository<ResourceInlineCommentEntity, String> {
 
-    @Query("{ '_id': ?0, 'resourceId': ?1, 'deletedAt': null }")
-    Optional<ResourceInlineCommentEntity> findByIdAndResourceIdAndDeletedAtIsNull(String inlineCommentId, String resourceId);
+    @Query("{ '_id': ?0, 'resourceId': ?1 }")
+    Optional<ResourceInlineCommentEntity> findByIdAndResourceId(String inlineCommentId, String resourceId);
 }

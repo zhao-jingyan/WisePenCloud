@@ -1,7 +1,9 @@
 package com.oriole.wisepen.resource.repository;
 
 import com.oriole.wisepen.resource.domain.base.ResourceInlineCommentItemBase;
+import com.oriole.wisepen.resource.domain.base.ResourceInlineCommentItemReactionBase;
 import com.oriole.wisepen.resource.domain.entity.ResourceInlineCommentEntity;
+import org.bson.Document;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
@@ -24,8 +26,7 @@ public class CustomResourceInlineCommentRepository {
     public List<ResourceInlineCommentEntity> listInlineComments(String resourceId,
                                                                 Integer contentVersion,
                                                                 Boolean resolved) {
-        Criteria criteria = Criteria.where("resourceId").is(resourceId)
-                .and("deletedAt").is(null);
+        Criteria criteria = Criteria.where("resourceId").is(resourceId);
         if (contentVersion != null) {
             criteria.andOperator(
                     new Criteria().orOperator(
@@ -48,29 +49,64 @@ public class CustomResourceInlineCommentRepository {
 
     public void appendItem(String resourceId, String inlineCommentId, ResourceInlineCommentItemBase item) {
         Query query = Query.query(Criteria.where("_id").is(inlineCommentId)
-                .and("resourceId").is(resourceId)
-                .and("deletedAt").is(null));
+                .and("resourceId").is(resourceId));
         Update update = new Update()
                 .push("items", item)
                 .set("updateTime", LocalDateTime.now());
         mongoTemplate.updateFirst(query, update, ResourceInlineCommentEntity.class);
     }
 
-    public void softDeleteItem(String resourceId, String inlineCommentId, String itemId) {
-        Criteria itemCriteria = Criteria.where("itemId").is(itemId).and("deletedAt").is(null);
+    public void deleteInlineComment(String resourceId, String inlineCommentId) {
+        Query query = Query.query(Criteria.where("_id").is(inlineCommentId)
+                .and("resourceId").is(resourceId));
+        mongoTemplate.remove(query, ResourceInlineCommentEntity.class);
+    }
+
+    public void deleteItem(String resourceId, String inlineCommentId, String itemId) {
+        Query query = Query.query(Criteria.where("_id").is(inlineCommentId)
+                .and("resourceId").is(resourceId));
+        Update update = new Update()
+                .pull("items", new Document("itemId", itemId))
+                .set("updateTime", LocalDateTime.now());
+        mongoTemplate.updateFirst(query, update, ResourceInlineCommentEntity.class);
+    }
+
+    public void updateItem(String resourceId, String inlineCommentId, String itemId, String authorId,
+                           String content, List<String> imageUrls, List<String> mentionUserIds) {
+        Criteria itemCriteria = Criteria.where("itemId").is(itemId).and("authorId").is(authorId);
         Query query = Query.query(Criteria.where("_id").is(inlineCommentId)
                 .and("resourceId").is(resourceId)
-                .and("deletedAt").is(null)
                 .and("items").elemMatch(itemCriteria));
+        LocalDateTime now = LocalDateTime.now();
         Update update = new Update()
-                .set("items.$.deletedAt", LocalDateTime.now());
+                .set("items.$.content", content)
+                .set("items.$.imageUrls", imageUrls)
+                .set("items.$.mentionUserIds", mentionUserIds)
+                .set("items.$.updateTime", now)
+                .set("updateTime", now);
+        mongoTemplate.updateFirst(query, update, ResourceInlineCommentEntity.class);
+    }
+
+    public void setItemReaction(String resourceId, String inlineCommentId, String itemId,
+                                String operatorUserId, ResourceInlineCommentItemReactionBase reaction) {
+        Query query = Query.query(Criteria.where("_id").is(inlineCommentId)
+                .and("resourceId").is(resourceId)
+                .and("items").elemMatch(Criteria.where("itemId").is(itemId)));
+        Update update = new Update().set("items.$.reactions." + operatorUserId, reaction);
+        mongoTemplate.updateFirst(query, update, ResourceInlineCommentEntity.class);
+    }
+
+    public void deleteItemReaction(String resourceId, String inlineCommentId, String itemId, String operatorUserId) {
+        Query query = Query.query(Criteria.where("_id").is(inlineCommentId)
+                .and("resourceId").is(resourceId)
+                .and("items").elemMatch(Criteria.where("itemId").is(itemId)));
+        Update update = new Update().unset("items.$.reactions." + operatorUserId);
         mongoTemplate.updateFirst(query, update, ResourceInlineCommentEntity.class);
     }
 
     public void resolveInlineComment(String resourceId, String inlineCommentId, String resolvedBy) {
         Query query = Query.query(Criteria.where("_id").is(inlineCommentId)
-                .and("resourceId").is(resourceId)
-                .and("deletedAt").is(null));
+                .and("resourceId").is(resourceId));
         Update update = new Update()
                 .set("resolved", true)
                 .set("resolvedBy", resolvedBy)
@@ -81,8 +117,7 @@ public class CustomResourceInlineCommentRepository {
 
     public void unresolveInlineComment(String resourceId, String inlineCommentId) {
         Query query = Query.query(Criteria.where("_id").is(inlineCommentId)
-                .and("resourceId").is(resourceId)
-                .and("deletedAt").is(null));
+                .and("resourceId").is(resourceId));
         Update update = new Update()
                 .set("resolved", false)
                 .unset("resolvedBy")

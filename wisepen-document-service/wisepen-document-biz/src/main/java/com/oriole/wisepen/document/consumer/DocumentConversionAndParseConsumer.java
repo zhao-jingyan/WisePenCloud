@@ -127,14 +127,9 @@ public class DocumentConversionAndParseConsumer {
             DocumentContentEntity content;
             // 如果文件是 PDF
             if (ResourceType.PDF == msg.getFileType()) {
-                if (isOnlyOfficeAvailable) { // 如果 OnlyOffice 可用，使用 OnlyOffice 转为 MD
-                    documentFileService.convertTo(downloadUrl, sourceFile.getName(), msg.getFileType(), mdFile, OnlyOfficeConversionClient.ConversionTargetType.MD);
-                    byte[] bytes = Files.readAllBytes(mdFile.toPath());
-                    content = DocumentContentEntity.builder().markdown(new String(bytes, StandardCharsets.UTF_8)).build();
-                } else { // 使用 PDFBox 转为 Text
-                    String rawText = documentFileService.extractPDFText(pdfFile);
-                    content = DocumentContentEntity.builder().rawText(rawText).build();
-                }
+                 // 使用 PDFBox 转为 Text
+                String rawText = documentFileService.extractPDFText(pdfFile);
+                content = DocumentContentEntity.builder().rawText(rawText).build();
             } else if (Set.of(ResourceType.DOC, ResourceType.DOCX).contains(msg.getFileType())) {
                 // 如果文件是 DOC/DOCX
                 if (isOnlyOfficeAvailable) { // 如果 OnlyOffice 可用，使用 OnlyOffice 转为 MD
@@ -150,8 +145,7 @@ public class DocumentConversionAndParseConsumer {
                 content = DocumentContentEntity.builder().markdown(markdown).build();
             }
 
-            if (ResourceType.PDF == msg.getFileType() || ResourceType.DOC == msg.getFileType() || ResourceType.DOCX == msg.getFileType()
-                    && StrUtil.isNotBlank(content.getMarkdown())) {
+            if (ResourceType.DOC == msg.getFileType() || ResourceType.DOCX == msg.getFileType() && StrUtil.isNotBlank(content.getMarkdown())) {
                 content.setMarkdown(markdownPageBreakInjector.inject(content.getMarkdown(), pdfFile, msg.getDocumentId()));
             }
 

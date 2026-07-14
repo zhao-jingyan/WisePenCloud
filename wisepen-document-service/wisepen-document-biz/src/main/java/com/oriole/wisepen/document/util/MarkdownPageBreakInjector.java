@@ -25,8 +25,11 @@ public class MarkdownPageBreakInjector {
         }
 
         List<String> pdfPageTexts = extractPdfPageTexts(pdfFile, documentId);
-        if (pdfPageTexts.size() <= 1) {
-            return markdown; // 如果 PDF 只有 0 或 1 页，不需要分页符，原样返回
+        if (pdfPageTexts.isEmpty()) {
+            return markdown;
+        }
+        if (pdfPageTexts.size() == 1) {
+            return pageStartMarker(1) + "\n\n" + markdown.trim() + "\n\n" + pageEndMarker(1);
         }
 
         NormalizedText normalizedMarkdown = normalizeWithOffsets(markdown); // 归一化，并保留归一化字符 -> 原 Markdown offset的映射。
@@ -64,12 +67,17 @@ public class MarkdownPageBreakInjector {
                     documentId, pdfFile.getName(), pdfPageTexts.size(), insertions.size());
         }
 
-        return applyInsertions(markdown, insertions);
+        return applyInsertions(markdown, insertions, pdfPageTexts.size());
     }
 
-    // 分页符格式
-    public static String pageBreakMarker(int pageNo) {
-        return "<!-- pagebreak page=" + pageNo + " -->";
+    // 页起始标记格式
+    public static String pageStartMarker(int pageNo) {
+        return "<!-- page:start page=" + pageNo + " -->";
+    }
+
+    // 页结束标记格式
+    public static String pageEndMarker(int pageNo) {
+        return "<!-- page:end page=" + pageNo + " -->";
     }
 
     // PDF 逐页抽取
@@ -117,7 +125,7 @@ public class MarkdownPageBreakInjector {
         return null;
     }
 
-    private String applyInsertions(String markdown, List<Insertion> insertions) {
+    private String applyInsertions(String markdown, List<Insertion> insertions, int pageCount) {
         // 从前往后插入，第一个分页符会改变后面所有 offset，导致后续插错位置
         // 倒序插入可以避免 offset 位移问题
         StringBuilder result = new StringBuilder(markdown);
@@ -125,8 +133,9 @@ public class MarkdownPageBreakInjector {
                 .sorted(Comparator.comparingInt(Insertion::offset).reversed())
                 .forEach(insertion -> result.insert(
                         insertion.offset(),
-                        "\n\n" + pageBreakMarker(insertion.pageNo()) + "\n\n"));
-        return result.toString().trim();
+                        "\n\n" + pageEndMarker(insertion.pageNo() - 1)
+                                + "\n\n" + pageStartMarker(insertion.pageNo()) + "\n\n"));
+        return (pageStartMarker(1) + "\n\n" + result.toString().trim() + "\n\n" + pageEndMarker(pageCount)).trim();
     }
 
     private static int toOriginalOffset(NormalizedText normalizedText, int markdownLength, int normalizedIndex) {

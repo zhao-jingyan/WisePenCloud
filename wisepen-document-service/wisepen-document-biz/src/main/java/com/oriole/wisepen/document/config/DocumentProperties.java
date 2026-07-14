@@ -13,8 +13,7 @@ import org.springframework.stereotype.Component;
 public class DocumentProperties {
 
     /**
-     * 文档转换 provider：onlyoffice 或 legacy。
-     * legacy 保留原 JODConverter + PDFTextStripper 路径，用于灰度回滚。
+     * 文档转换 provider：onlyoffice 或 legacy
      */
     private String conversionProvider = "onlyoffice";
 

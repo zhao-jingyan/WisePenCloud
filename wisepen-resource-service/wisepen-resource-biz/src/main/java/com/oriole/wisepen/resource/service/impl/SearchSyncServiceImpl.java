@@ -17,6 +17,7 @@ import com.oriole.wisepen.resource.exception.ResourceError;
 import com.oriole.wisepen.resource.repository.ESIndexRepository;
 import com.oriole.wisepen.resource.repository.MarketESIndexRepository;
 import com.oriole.wisepen.resource.service.ISearchSyncService;
+import com.oriole.wisepen.resource.util.SearchTextSanitizer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
@@ -55,7 +56,7 @@ public class SearchSyncServiceImpl implements ISearchSyncService {
 
     @Override
     public void syncResourceContent(String resourceId, String content) {
-        executeESUpsert(new ESIndexEntity(resourceId, content), EnumSet.of(UpsertField.CONTENT));
+        executeESUpsert(new ESIndexEntity(resourceId, SearchTextSanitizer.sanitize(content)), EnumSet.of(UpsertField.CONTENT));
     }
 
     @Override
@@ -127,7 +128,7 @@ public class SearchSyncServiceImpl implements ISearchSyncService {
         if (marketSaleInfo == null) return;
         if (marketSaleInfo.getOfferVersion() == null) return;
 
-        String fullText = getVersionSearchText(entity.getResourceId(), entity.getResourceType(), marketSaleInfo.getOfferVersion());
+        String fullText = SearchTextSanitizer.sanitize(getVersionSearchText(entity.getResourceId(), entity.getResourceType(), marketSaleInfo.getOfferVersion()));
         String previewContent = truncatePreviewContent(fullText, marketSaleInfo.getReviewContentPercentage());
         executeMarketESUpsert(new MarketESIndexEntity(entity, marketGroupId, previewContent, fullText));
     }

@@ -7,9 +7,7 @@ import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 @Data
@@ -31,9 +29,6 @@ public class ResourceInlineCommentBase {
 
     private String resolvedBy;
     private LocalDateTime resolvedAt;
-
-    /** null 表示未软删除 */
-    private LocalDateTime deletedAt;
 
     @Data
     @Builder

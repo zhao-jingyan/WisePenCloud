@@ -389,11 +389,10 @@ public class DocumentServiceImpl implements IDocumentService {
         DocumentVersionEntity versionEntity = getDocumentVersion(resourceId, targetVersion);
         DocumentContentEntity contentEntity = documentContentRepository.findById(versionEntity.getDocumentId())
                 .orElseThrow(() -> new ServiceException(DocumentError.DOCUMENT_NOT_FOUND));
-        String searchText = contentEntity.getMarkdown() != null ? contentEntity.getMarkdown() : contentEntity.getRawText();
         return DocumentSearchTextResponse.builder()
                 .resourceId(resourceId)
                 .version(versionEntity.getVersion())
-                .searchText(searchText)
+                .searchText(getSearchText(contentEntity))
                 .build();
     }
 
@@ -481,10 +480,13 @@ public class DocumentServiceImpl implements IDocumentService {
 
         this.updateStatus(documentId, new DocumentStatus(DocumentStatusEnum.READY));
 
+        String readyContent = documentContentRepository.findById(documentId)
+                .map(DocumentServiceImpl::getSearchText)
+                .orElse(null);
         eventPublisher.publishReadyEvent(DocumentReadyMessage.builder()
                 .resourceId(resourceId)
                 .version(versionEntity.getVersion())
-                .content(documentContentRepository.findById(documentId).map(DocumentContentEntity::getMarkdown).orElse(null))
+                .content(readyContent)
                 .build());
 
         log.debug("document ready finalized. documentId={} resourceId={}", documentId, resourceId);
@@ -578,7 +580,7 @@ public class DocumentServiceImpl implements IDocumentService {
             eventPublisher.publishReadyEvent(DocumentReadyMessage.builder()
                     .resourceId(resourceId)
                     .version(1)
-                    .content(targetContent.getMarkdown())
+                    .content(getSearchText(targetContent))
                     .build());
             log.info("document fork finished. sourceResourceId={} sourceVersion={} resourceId={} documentId={}",
                     request.getResourceId(), sourceVersion.getVersion(), resourceId, targetDocumentId);
@@ -600,5 +602,9 @@ public class DocumentServiceImpl implements IDocumentService {
                     request.getResourceId(), targetDocumentId, e);
             throw new ServiceException(DocumentError.DOCUMENT_FORK_FAILED, e.getMessage());
         }
+    }
+
+    private static String getSearchText(DocumentContentEntity contentEntity) {
+        return contentEntity.getMarkdown() != null ? contentEntity.getMarkdown() : contentEntity.getRawText();
     }
 }

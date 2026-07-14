@@ -5,6 +5,7 @@ import com.oriole.wisepen.document.exception.DocumentError;
 import com.oriole.wisepen.document.service.IDocumentFileService;
 import com.oriole.wisepen.document.util.OfficeMarkdownExtractor;
 import com.oriole.wisepen.document.util.OnlyOfficeConversionClient;
+import com.oriole.wisepen.document.util.PdfTextNormalizer;
 import com.oriole.wisepen.resource.enums.ResourceType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -17,6 +18,9 @@ import org.springframework.stereotype.Service;
 import java.io.File;
 import java.io.IOException;
 import java.util.Set;
+
+import static com.oriole.wisepen.document.util.MarkdownPageBreakInjector.pageEndMarker;
+import static com.oriole.wisepen.document.util.MarkdownPageBreakInjector.pageStartMarker;
 
 @Slf4j
 @Service
@@ -55,7 +59,7 @@ public class DocumentFileServiceImpl implements IDocumentFileService {
 
     @Override
     public String extractMarkdown(File source, ResourceType fileType) {
-        if (!Set.of(ResourceType.DOC, ResourceType.DOCX, ResourceType.PPT, ResourceType.PPTX, ResourceType.XLS, ResourceType.XLSX).contains(fileType)){
+        if (!Set.of(ResourceType.DOC, ResourceType.DOCX, ResourceType.PPT, ResourceType.PPTX, ResourceType.XLS, ResourceType.XLSX).contains(fileType)) {
             throw new ServiceException(DocumentError.CANNOT_SUPPORT_FILE_TYPE);
         }
         try {
@@ -73,10 +77,25 @@ public class DocumentFileServiceImpl implements IDocumentFileService {
         log.debug("pdf text extraction started. source={}", pdfFile.getName());
         try (PDDocument doc = PDDocument.load(pdfFile)) {
             PDFTextStripper stripper = new PDFTextStripper();
-            stripper.setSortByPosition(true); // 保留段落换行，去除多余空白
-            String text = stripper.getText(doc);
-            log.debug("pdf text extraction finished. charCount={}", text.length());
-            return text;
+            stripper.setSortByPosition(true);
+            int pageCount = doc.getNumberOfPages();
+            int charCount = 0;
+            StringBuilder normalizedText = new StringBuilder();
+            for (int pageNo = 1; pageNo <= pageCount; pageNo++) {
+                stripper.setStartPage(pageNo);
+                stripper.setEndPage(pageNo);
+                String pageText = stripper.getText(doc);
+                charCount += pageText.length();
+
+                pageText = PdfTextNormalizer.normalize(pageText);
+                if (!normalizedText.isEmpty()) normalizedText.append("\n\n");
+                normalizedText.append(pageStartMarker(pageNo)).append("\n\n");
+                if (pageText != null && !pageText.isBlank()) normalizedText.append(pageText).append("\n\n");
+                normalizedText.append(pageEndMarker(pageNo));
+            }
+            log.debug("pdf text extraction finished. pages={} charCount={} normalizedCharCount={}",
+                    pageCount, charCount, normalizedText.length());
+            return normalizedText.toString().trim();
         } catch (IOException e) {
             log.error("pdf text extraction failed. source={}", pdfFile.getName(), e);
             throw new ServiceException(DocumentError.DOCUMENT_PROCESS_CONTENT_READ_FAILED);

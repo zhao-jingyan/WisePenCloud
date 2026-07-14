@@ -5,6 +5,9 @@ import com.oriole.wisepen.user.api.domain.base.UserDisplayBase;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
 
+import java.util.ArrayList;
+import java.util.List;
+
 @EqualsAndHashCode(callSuper = true)
 @Data
 @SuperBuilder
@@ -12,4 +15,7 @@ import lombok.experimental.SuperBuilder;
 @AllArgsConstructor
 public class InlineCommentItemResponse extends ResourceInlineCommentItemBase {
     private UserDisplayBase authorInfo;
+
+    @Builder.Default
+    private List<InlineCommentItemReactionGroupResponse> reactionGroups = new ArrayList<>();
 }

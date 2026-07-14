@@ -33,7 +33,7 @@ public class InternalSkillController {
     private final SkillVersionServiceImpl skillVersionService;
 
     @GetMapping("/getSkillByResourceId")
-    public R<SkillInfoResponse> getPublishedSkillByResourceId(@RequestParam String resourceId, @RequestParam(required = false) Integer skillVersion) {
+    public R<SkillInfoResponse> getSkillByResourceId(@RequestParam String resourceId, @RequestParam(required = false) Integer skillVersion) {
         AIResourceInfoBase skill = skillService.getAIResourceInfo(resourceId);
         if (skillVersion == null) skillVersion = skill.getVersion();
         if (skillVersion <= 0) {
