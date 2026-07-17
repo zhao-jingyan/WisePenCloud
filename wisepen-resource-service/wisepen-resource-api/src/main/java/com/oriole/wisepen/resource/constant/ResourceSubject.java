@@ -13,7 +13,8 @@ public enum ResourceSubject implements IBusinessSubject {
     FILE_ORG_LOGIC,
     MARKET,
     FAVORITE,
-    COMMENT;
+    COMMENT,
+    INLINE_COMMENT;
 
     @Override
     public String key() {

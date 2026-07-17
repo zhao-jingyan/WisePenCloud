@@ -70,9 +70,12 @@ public enum ResourceError implements IResult {
 
     // 评论相关异常
     COMMENT_NOT_FOUND(5911, new ResultKey(BusinessDomain.RESOURCE, ResourceSubject.COMMENT, ErrorReason.NOT_FOUND), "评论不存在"),
+    INLINE_COMMENT_NOT_FOUND(5912, new ResultKey(BusinessDomain.RESOURCE, ResourceSubject.INLINE_COMMENT, ErrorReason.NOT_FOUND), "行内批注不存在"),
     COMMENT_DELETE_ACCESS_DENIED(5921, new ResultKey(BusinessDomain.RESOURCE, ResourceSubject.COMMENT, ErrorReason.PERMISSION_DENIED), "无权删除该评论或回复"),
     COMMENT_RESOLVE_ACCESS_DENIED(5922, new ResultKey(BusinessDomain.RESOURCE, ResourceSubject.COMMENT, ErrorReason.PERMISSION_DENIED), "无权解决该评论"),
-    COMMENT_UPDATE_ACCESS_DENIED(5923, new ResultKey(BusinessDomain.RESOURCE, ResourceSubject.COMMENT, ErrorReason.PERMISSION_DENIED), "无权修改该评论");
+    COMMENT_UPDATE_ACCESS_DENIED(5923, new ResultKey(BusinessDomain.RESOURCE, ResourceSubject.COMMENT, ErrorReason.PERMISSION_DENIED), "无权修改该评论"),
+    INLINE_COMMENT_CURSOR_INVALID(5931, new ResultKey(BusinessDomain.RESOURCE, ResourceSubject.INLINE_COMMENT, ErrorReason.INVALID), "行内批注增量游标无效"),
+    INLINE_COMMENT_REVISION_CONFLICT(5941, new ResultKey(BusinessDomain.RESOURCE, ResourceSubject.INLINE_COMMENT, ErrorReason.CONFLICT), "行内批注版本并发冲突");
     private final Integer code;
     private final ResultKey key;
     private final String msg;
